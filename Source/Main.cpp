@@ -216,9 +216,20 @@ int main()
 					// Debug.
 					//std::cout << std::string(Input, 1024) << std::endl;
 
+					if (Input[4] == 7)
+					{
+						for (auto& c : ConnectedClients)
+						{
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + ": " + std::string(Input, read).erase(0, 5);
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(Client, Header + Out);
+						}
+						continue;
+					}
+
 					if (Input[4] == 10 && RoomID == -1)
 					{
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Welcome to the Server, Use CTRL+ENTER to select.\n";
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Welcome to the Server, Use CTRL+ENTER to select.";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
 						continue;
@@ -226,7 +237,7 @@ int main()
 
 					if (!LoggedIn)
 					{
-						std::stringstream in(std::string(Input, 1024).erase(0,6));
+						std::stringstream in(std::string(Input, 1024).erase(0,8));
 						std::string Val;
 						std::vector<std::string> Vals;
 
@@ -289,7 +300,7 @@ int main()
 							UserName = Vals[0];
 						}
 
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\0') + "Correct Password.\n";
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\0') + "Correct Password.";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
 						LoggedIn = true;
@@ -311,7 +322,7 @@ int main()
 
 						if (Vals[0].empty())
 						{
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "You can't have an empty room name you silly xd.\n";
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "You can't have an empty room name you silly xd.";
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 							m_TCPServer->Send(Client, Header + Out);
 							continue;
@@ -325,7 +336,7 @@ int main()
 
 							PlayerRooms.push_back({g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 1});
 
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Created Room: "+ Vals[0] + "\n";
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Created Room: "+ Vals[0];
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 							m_TCPServer->Send(Client, Header + Out);
 						}
@@ -340,6 +351,7 @@ int main()
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(Client, Header + Out);
 							}
+							continue;
 						}
 					}
 				}
