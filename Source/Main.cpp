@@ -10,6 +10,37 @@
 #include <chrono>
 #include "SQLiteCpp/SQLiteCpp.h"
 
+/*	EzSocket Info.
+	0 - Ezsocket empty.
+	0 - Ezsocket empty.
+	0 - Ezsocket empty.
+	1 - Data Size.
+	//
+	128 - SMOProtocol.
+	rest = Data
+*/
+
+/*	SMOProtocol Info.
+	0 - Ping.
+	1 - Ping Respond.
+	2 - Hello.
+	3 - GameStart.
+	4 - GameOver.
+	5 - GameStatusUpdate.
+	6 - StyleUpdate.
+	7 - Chat.
+	8 - RequestStart.
+	9 - Reserved1.
+	10 - MusicSelect.
+	11 - PlayerOptions.
+	12 - StepManiaOnline.
+	--	 Are these even used?
+	13 - RESERVED1.
+	14 - RESERVED2.
+	15 - RESERVED3.
+	16 - FriendListUpdate.
+*/
+
 void SMOListener()
 {
 	while (Running)
@@ -179,14 +210,22 @@ int main()
 
 				if (read > 0)
 				{
+					if (Input[4] == 6)
+						continue;
+
 					// Debug.
 					//std::cout << std::string(Input, 1024) << std::endl;
 
+					if (Input[4] == 10 && RoomID == -1)
+					{
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Welcome to the Server, Use CTRL+ENTER to select.\n";
+						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+						m_TCPServer->Send(Client, Header + Out);
+						continue;
+					}
+
 					if (!LoggedIn)
 					{
-						if (Input[4] == 6)
-							continue;
-
 						std::stringstream in(std::string(Input, 1024).erase(0,6));
 						std::string Val;
 						std::vector<std::string> Vals;
@@ -196,7 +235,7 @@ int main()
 							Vals.push_back(Val);
 						}
 
-						Vals.erase(std::remove(Vals.begin(), Vals.end(), "\0"), Vals.end());
+						Vals.erase(std::remove(Vals.begin()+2, Vals.end(), "\0"), Vals.end());
 
 						bool FoundUser = false;
 
@@ -254,18 +293,54 @@ int main()
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
 						LoggedIn = true;
-
+						continue;
 					}
 
 					if (RoomID < 0)
 					{
+						std::stringstream in(std::string(Input, 1024).erase(0, 7));
+						std::string Val;
+						std::vector<std::string> Vals;
 
+						while (std::getline(in, Val, '\0'))
+						{
+							Vals.push_back(Val);
+						}
 
+						Vals.erase(std::remove(Vals.begin()+3, Vals.end(), "\0"), Vals.end());
 
+						if (Vals[0].empty())
+						{
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "You can't have an empty room name you silly xd.\n";
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(Client, Header + Out);
+							continue;
+						}
 
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
 
+						if (result == PlayerRooms.end())
+						{
+							RoomID = g_RoomID;
 
+							PlayerRooms.push_back({g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 1});
 
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Created Room: "+ Vals[0] + "\n";
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(Client, Header + Out);
+						}
+
+						result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
+
+						if (result != PlayerRooms.end())
+						{
+							if (result->RoomPassword.empty() || result->RoomPassword == Vals[2])
+							{
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1');
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(Client, Header + Out);
+							}
+						}
 					}
 				}
 			}
