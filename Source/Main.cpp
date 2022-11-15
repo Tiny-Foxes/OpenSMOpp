@@ -222,7 +222,7 @@ int main()
 						{
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + ": " + std::string(Input, read).erase(0, 5);
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(Client, Header + Out);
+							m_TCPServer->Send(c.Client, Header + Out);
 						}
 						continue;
 					}
