@@ -59,6 +59,30 @@ void UpdateRooms(ASocket::Socket Client)
 	m_TCPServer->Send(Client, Header + Out);
 }
 
+void JoinPlayer(Clients& client, std::vector<Clients>& clients)
+{
+	for (auto& c : clients)
+	{
+		if (c.RoomID != client.RoomID || c.UserName == client.UserName) 
+			continue;
+		std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Joined: " + client.UserName;
+		std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+		m_TCPServer->Send(c.Client, Header + Out);
+	}
+}
+
+void LeavePlayer(Clients& client, std::vector<Clients>& clients)
+{
+	for (auto& c : clients)
+	{
+		if (c.RoomID != client.RoomID || c.UserName == client.UserName)
+			continue;
+		std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Left: " + client.UserName;
+		std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+		m_TCPServer->Send(c.Client, Header + Out);
+	}
+}
+
 void JoinRoom(Clients& client, std::vector<std::string> Vals)
 {
 	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
@@ -86,7 +110,49 @@ void JoinRoom(Clients& client, std::vector<std::string> Vals)
 			m_TCPServer->Send(client.Client, Header + Out);
 		}
 	}
+}
 
+void LeaveRoom(Clients& client, std::vector<Clients>& clients)
+{
+	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return client.RoomID == Room.RoomID; });
+
+	if (result != PlayerRooms.end())
+	{
+		--result->NumPlayers;
+		long long OldRoomID = client.RoomID;
+		client.RoomID = -1;
+
+		if (client.UserType != 2)
+			client.UserType = 0;
+
+		if (result->NumPlayers == 0)
+		{
+			PlayerRooms.erase(result);
+		}
+		else
+		{
+			if (client.UserName == result->Owner)
+			{
+				for (auto& c : clients)
+				{
+					if (c.RoomID != OldRoomID)
+						continue;
+					(*result).Owner = c.UserName;
+					c.UserType = 1;
+					break;
+				}
+
+				for (auto& c : clients)
+				{
+					if (c.RoomID != OldRoomID)
+						continue;
+					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Old room owner left, New room owner: " + result->Owner;
+					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+					m_TCPServer->Send(c.Client, Header + Out);
+				}
+			}
+		}
+	}
 }
 
 void SMOListener()
@@ -223,7 +289,9 @@ int main()
 			m_Mutex.unlock();
 		}
 		else
-			std::cout << strLogMsg << std::endl;
+		{
+			//std::cout << strLogMsg << std::endl;
+		}
 	};
 
 	m_TCPServer = new CTCPServer(LogPrinter, std::to_string(ServerPort).c_str());
@@ -269,6 +337,11 @@ int main()
 				{
 					std::cout << "User: " << UserName << " '" << Ip << "' Disconnected.\n";
 					m_TCPServer->Disconnect(Client);
+					if (LoggedIn)
+					{
+						LeavePlayer(Values, CurClients);
+						LeaveRoom(Values, CurClients);
+					}
 					CurClients.erase(std::remove_if(CurClients.begin(), CurClients.end(), [&](Clients const& client) { return client.Client == Client; }), CurClients.end());
 					continue;
 				}
@@ -303,6 +376,7 @@ int main()
 							{
 								std::string LCommands;
 
+								LCommands += "/users - Show Online Users in Cur Room.\n";
 								LCommands += "/login - login as admin.\n";
 
 								if (UserType == 2) // Admin Commands
@@ -312,6 +386,20 @@ int main()
 								}
 
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + LCommands;
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(Client, Header + Out);
+								continue;
+							}
+
+							if (Command == "users")
+							{
+								std::string Users;
+
+								for (auto& c : CurClients)
+									if (c.RoomID == RoomID && c.LoggedIn)
+										Users += std::string(1, ' ') + c.UserName;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + Users;
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(Client, Header + Out);
 								continue;
@@ -402,11 +490,18 @@ int main()
 					}
 
 					if (Input[4] == 10 && RoomID == -1 && Input[5] == 6)
-						UpdateRooms(Client);
-
-					if (Input[4] == 10 && RoomID == -1 && Input[5] == 7)
 					{
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Welcome to the Server, Use CTRL+ENTER to select.";
+						UpdateRooms(Client);
+						continue;
+					}
+
+					if (Input[4] == 10 && Input[5] == 7)
+					{
+						//LeavePlayer(Values, CurClients);
+						LeaveRoom(Values, CurClients);
+						JoinPlayer(Values, CurClients);
+
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + std::string(20, '\n') + "Welcome to the Server, Use CTRL+ENTER to select, type /help for info.";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
 						UpdateRooms(Client);
@@ -415,15 +510,9 @@ int main()
 
 					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
 					{
-						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&RoomID](Rooms& Room) { return RoomID == Room.RoomID; });
-						--result->NumPlayers;
-
-						if (result->NumPlayers == 0)
-							PlayerRooms.erase(result);
-
-						RoomID = -1;
-						if (UserType != 2)
-							UserType = 0;
+						LeavePlayer(Values, CurClients);
+						LeaveRoom(Values, CurClients);
+						//JoinPlayer(Values, CurClients);
 						for (auto& c : CurClients)
 							UpdateRooms(c.Client);
 
@@ -549,9 +638,11 @@ int main()
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(c.Client, Header + Out);
 							}
-
+							LeavePlayer(Values, CurClients);
 							JoinRoom(Values, Vals);
+							JoinPlayer(Values, CurClients);
 						}
+						continue;
 					}
 
 					if (RoomID < 0 && Input[4] == 12 && Input[5] == 1)
@@ -570,20 +661,13 @@ int main()
 						Vals[2] = Vals[1];
 						Vals[1] = "";
 
+						LeavePlayer(Values, CurClients);
 						JoinRoom(Values, Vals);
+						JoinPlayer(Values, CurClients);
+						continue;
 					}
 				}
 			}
-			// ping pong.
-			//std::string Out = std::string(1, static_cast<char>(ProtocolVersion));
-			//std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-			//if (!m_TCPServer->Send(Client, Header + Out))
-			//{
-			//	m_TCPServer->Disconnect(Client);
-			//	ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == Client; }), ConnectedClients.end());
-			//}
-
-
 		}
 
 		for (auto& Client : CurClients)
