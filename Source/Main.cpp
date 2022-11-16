@@ -137,6 +137,7 @@ int main()
 	ProtocolVersion = atol(ini["Server"]["ProtocolVersion"].c_str());
 	ServerPort = atol(ini["Server"]["ServerPort"].c_str());
 	MaxPlayers = atol(ini["Server"]["MaxPlayers"].c_str());
+	ElevatedUserLogin = ini["Server"]["ServerPassword"];
 	ServerDB = ini["ServerDB"]["File"];
 	PWSalt = ini["ServerDB"]["PasswordSalt"];
 
@@ -168,6 +169,12 @@ int main()
 	{
 		ini["Server"]["MaxPlayers"] = "255";
 		MaxPlayers = 255;
+	}
+
+	if (ElevatedUserLogin.empty())
+	{
+		ini["Server"]["ServerPassword"] = "ChangeMe";
+		ElevatedUserLogin = "ChangeMe";
 	}
 
 	if (ServerDB.empty())
@@ -247,6 +254,7 @@ int main()
 			auto& Client = Values.Client;
 			auto& LoggedIn = Values.LoggedIn;
 			auto& Ip = Values.IP;
+			auto& UserType = Values.UserType;
 			auto& UserName = Values.UserName;
 			auto& RoomID = Values.RoomID;
 
@@ -275,12 +283,118 @@ int main()
 
 					if (Input[4] == 7)
 					{
+						if (Input[5] == '/') // Server Command
+						{
+							std::string Command = std::string(Input, read).erase(0, 6);
+							std::string Argument;
+							if (Command.find(' ') != std::string::npos)
+							{
+								Command.erase(Command.find_first_of(' '));
+								Argument = std::string(Input, read).erase(0, 6 + Command.size()+1);
+								Argument.erase(std::remove(Argument.begin(), Argument.end(), '\0'), Argument.end());
+							}
+
+							Command.erase(std::remove(Command.begin(), Command.end(), '\0'), Command.end());
+
+							// Use lower text for commands
+							std::transform(Command.begin(), Command.end(), Command.begin(), [](unsigned char c) { return std::tolower(c); });
+
+							if (Command == "help")
+							{
+								std::string LCommands;
+
+								LCommands += "/login - login as admin.\n";
+
+								if (UserType == 2) // Admin Commands
+								{
+									LCommands += "/adminkick - kick an user.\n";
+									LCommands += "/userip - get an user IP.\n";
+								}
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + LCommands;
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(Client, Header + Out);
+								continue;
+							}
+
+							if (Command == "login")
+							{
+								if (!Argument.empty() && Argument != "ChangeMe" && Argument == ElevatedUserLogin)
+								{
+									UserType = 2;
+
+									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Logged in as admin";
+									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+									m_TCPServer->Send(Client, Header + Out);
+									continue;
+								}
+							}
+
+							if (UserType == 2) // Admin Commands
+							{
+								if (Command == "adminkick")
+								{
+									auto result = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](Clients& client) { return Argument == client.UserName; });
+
+									if (result != CurClients.end())
+									{
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Kicked: " + Argument;
+										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+										m_TCPServer->Send(Client, Header + Out);
+
+										std::cout << "User: " << result->UserName << " '" << result->IP << "' Kicked.\n";
+										m_TCPServer->Disconnect(result->Client);
+										CurClients.erase(std::remove_if(CurClients.begin(), CurClients.end(), [&](Clients const& client) { return client.Client == result->Client; }), CurClients.end());
+									}
+									else
+									{
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Not Connected: " + Argument;
+										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+										m_TCPServer->Send(Client, Header + Out);
+									}
+									continue;
+								}
+
+								if (Command == "userip")
+								{
+									auto result = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](Clients& client) { return Argument == client.UserName; });
+
+									if (result != CurClients.end())
+									{
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User IP: '" + result->IP + "' For " + Argument;
+										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+										m_TCPServer->Send(Client, Header + Out);
+									}
+									else
+									{
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Not Connected: " + Argument;
+										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+										m_TCPServer->Send(Client, Header + Out);
+									}
+									continue;
+								}
+
+							}
+
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Invalid Command: " + Command;
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(Client, Header + Out);
+							continue;
+						}
+
 						for (auto& c : CurClients)
 						{
 							if (c.RoomID != RoomID)
 								continue;
 
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + ": " + std::string(Input, read).erase(0, 5);
+							std::string usertype = "[|c000ff00User|c0ffffff] ";
+
+							if (UserType == 2)
+								usertype = "[|c0ff0000Admin|c0ffffff] ";
+							else if (UserType == 1)
+								usertype = "[|c00000ffRoomHost|c0ffffff] ";
+
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + usertype + UserName + ": " + std::string(Input, read).erase(0, 5);
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 							m_TCPServer->Send(c.Client, Header + Out);
 						}
@@ -308,6 +422,11 @@ int main()
 							PlayerRooms.erase(result);
 
 						RoomID = -1;
+						if (UserType != 2)
+							UserType = 0;
+						for (auto& c : CurClients)
+							UpdateRooms(c.Client);
+
 						continue;
 					}
 
@@ -410,6 +529,9 @@ int main()
 						{
 							PlayerRooms.push_back({g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 0, 0, !Vals[2].empty()});
 
+							if (UserType != 2)
+								UserType = 1;
+
 							for (auto& c : ConnectedClients)
 							{
 								std::string RoomNames;
@@ -444,6 +566,9 @@ int main()
 						}
 
 						Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
+
+						Vals[2] = Vals[1];
+						Vals[1] = "";
 
 						JoinRoom(Values, Vals);
 					}

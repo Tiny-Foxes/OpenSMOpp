@@ -28,6 +28,7 @@ struct Clients {
 	bool LoggedIn = false;
 	std::string IP = "0.0.0.0";
 	std::string UserName = "Unknown";
+	unsigned UserType = 0;
 	long long RoomID = -1;
 };
 
@@ -37,6 +38,7 @@ std::vector<Clients> ConnectedClients;
 std::string m_IP;
 bool m_GotIP = false;
 std::string ServerName;
+std::string ElevatedUserLogin;
 unsigned ServerVersion;
 unsigned ProtocolVersion;
 unsigned ServerPort;
