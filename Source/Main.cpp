@@ -235,6 +235,18 @@ int main()
 						continue;
 					}
 
+					if (Input[4] == 10 && RoomID >= 0)
+					{
+						auto& result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&RoomID](Rooms& Room) { return RoomID == Room.RoomID; });
+						--result->NumPlayers;
+
+						if (result->NumPlayers == 0)
+							PlayerRooms.erase(result);
+
+						RoomID = -1;
+						continue;
+					}
+
 					if (!LoggedIn)
 					{
 						std::stringstream in(std::string(Input, 1024).erase(0,8));
@@ -332,13 +344,25 @@ int main()
 
 						if (result == PlayerRooms.end())
 						{
-							RoomID = g_RoomID;
+							PlayerRooms.push_back({g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 0, 0, !Vals[2].empty()});
 
-							PlayerRooms.push_back({g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 1});
+							for (auto& c : ConnectedClients)
+							{
+								std::string RoomNames;
+								std::string RoomStates;
+								std::string RoomFlags;
 
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Created Room: "+ Vals[0];
-							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(Client, Header + Out);
+								for (auto& Room : PlayerRooms)
+								{
+									RoomNames += Room.RoomName + std::string(1, '\0') + Room.RoomDescription + std::string(1, '\0');
+									RoomStates += std::string(1, static_cast<char>(Room.State));
+									RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
+								}
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\1') + std::string(1 , static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
 						}
 
 						result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
@@ -347,7 +371,21 @@ int main()
 						{
 							if (result->RoomPassword.empty() || result->RoomPassword == Vals[2])
 							{
-								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1');
+								++result->NumPlayers;
+								RoomID = result->RoomID;
+
+								std::string RoomNames;
+								std::string RoomStates;
+								std::string RoomFlags;
+
+								for (auto& Room : PlayerRooms)
+								{
+									RoomNames += Room.RoomName + std::string(1, '\0') + Room.RoomDescription + std::string(1, '\0');
+									RoomStates += std::string(1, static_cast<char>(Room.State));
+									RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
+								}
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(Client, Header + Out);
 							}

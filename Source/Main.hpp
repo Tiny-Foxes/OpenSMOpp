@@ -19,6 +19,8 @@ struct Rooms {
 	std::string RoomDescription = "";
 	std::string RoomPassword = "";
 	int NumPlayers = 0;
+	int State = 0;
+	bool PassFlag = false;
 };
 
 struct Clients {
