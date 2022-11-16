@@ -237,7 +237,7 @@ int main()
 
 					if (Input[4] == 10 && RoomID >= 0)
 					{
-						auto& result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&RoomID](Rooms& Room) { return RoomID == Room.RoomID; });
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&RoomID](Rooms& Room) { return RoomID == Room.RoomID; });
 						--result->NumPlayers;
 
 						if (result->NumPlayers == 0)
