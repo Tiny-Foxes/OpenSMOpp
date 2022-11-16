@@ -35,6 +35,7 @@ std::vector<Rooms> PlayerRooms;
 std::vector<Clients> ConnectedClients;
 
 std::string m_IP;
+bool m_GotIP = false;
 std::string ServerName;
 unsigned ServerVersion;
 unsigned ProtocolVersion;

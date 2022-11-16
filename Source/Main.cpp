@@ -54,6 +54,9 @@ void SMOListener()
 
 			if (Input[4] = 2)
 			{
+				while (!m_GotIP)
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
 				m_Mutex.lock();
 				std::cout << std::string(Input, Input[6]+2).erase(0,6) + " '" + m_IP + "'"+ " Connected with StepManiaOnline Protocol: V" + std::to_string(Input[5]) + "\n";
 				std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 2)) + std::string(1, static_cast<char>(ServerVersion)) + ServerName;
@@ -63,6 +66,7 @@ void SMOListener()
 				m_TCPServer->Send(ConnectedClient, Header + Out);
 				ConnectedClients.push_back({ ConnectedClient, false, m_IP});
 				m_Mutex.unlock();
+				m_GotIP = false;
 			}
 			else
 			{
@@ -151,14 +155,16 @@ int main()
 	transaction.commit();
 
 	std::string IP = "unknown";
+	bool GotIP = false;
 
-	auto LogPrinter = [&IP](const std::string& strLogMsg) {
+	auto LogPrinter = [&IP,&GotIP](const std::string& strLogMsg) {
 		if (strLogMsg.find("Incoming connection from") != std::string::npos)
 		{
 			m_Mutex.lock();
 			IP = strLogMsg;
 			IP.erase(0, IP.find_first_of('\'')+1);
 			IP.erase(IP.find_first_of('\''), IP.length());
+			GotIP = true;
 			m_Mutex.unlock();
 		}
 		else
@@ -181,11 +187,14 @@ int main()
 	{
 		m_Mutex.lock();
 		m_IP = IP;
+		if (!m_GotIP)
+			m_GotIP = GotIP;
+		GotIP = false;
+		std::vector<Clients> CurClients = ConnectedClients;
 		m_Mutex.unlock();
 
 
-		m_Mutex.lock();
-		for (auto& Values : ConnectedClients)
+		for (auto& Values : CurClients)
 		{
 			auto& Client = Values.Client;
 			auto& LoggedIn = Values.LoggedIn;
@@ -247,7 +256,7 @@ int main()
 						continue;
 					}
 
-					if (!LoggedIn)
+					if (!LoggedIn && Input[4] == 12)
 					{
 						std::stringstream in(std::string(Input, 1024).erase(0,8));
 						std::string Val;
@@ -319,7 +328,7 @@ int main()
 						continue;
 					}
 
-					if (RoomID < 0)
+					if (RoomID < 0 && Input[4] == 12 && Input[5] == 2)
 					{
 						std::stringstream in(std::string(Input, 1024).erase(0, 7));
 						std::string Val;
@@ -393,6 +402,10 @@ int main()
 						}
 					}
 				}
+				m_Mutex.lock();
+				ConnectedClients = CurClients;
+				m_Mutex.unlock();
+
 			}
 			// ping pong.
 			//std::string Out = std::string(1, static_cast<char>(ProtocolVersion));
@@ -404,7 +417,7 @@ int main()
 			//}
 
 		}
-		m_Mutex.unlock();
+	
 	}
 
 	Running = false;
