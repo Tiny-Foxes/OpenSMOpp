@@ -41,6 +41,54 @@
 	16 - FriendListUpdate.
 */
 
+void UpdateRooms(ASocket::Socket Client)
+{
+	std::string RoomNames;
+	std::string RoomStates;
+	std::string RoomFlags;
+
+	for (auto& Room : PlayerRooms)
+	{
+		RoomNames += Room.RoomName + std::string(1, '\0') + Room.RoomDescription + std::string(1, '\0');
+		RoomStates += std::string(1, static_cast<char>(Room.State));
+		RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
+	}
+
+	std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
+	std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+	m_TCPServer->Send(Client, Header + Out);
+}
+
+void JoinRoom(Clients& client, std::vector<std::string> Vals)
+{
+	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
+
+	if (result != PlayerRooms.end())
+	{
+		if (result->RoomPassword.empty() || result->RoomPassword == Vals[2])
+		{
+			++result->NumPlayers;
+			client.RoomID = result->RoomID;
+
+			std::string RoomNames;
+			std::string RoomStates;
+			std::string RoomFlags;
+
+			for (auto& Room : PlayerRooms)
+			{
+				RoomNames += Room.RoomName + std::string(1, '\0') + Room.RoomDescription + std::string(1, '\0');
+				RoomStates += std::string(1, static_cast<char>(Room.State));
+				RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
+			}
+
+			std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
+			std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+			m_TCPServer->Send(client.Client, Header + Out);
+		}
+	}
+
+}
+
 void SMOListener()
 {
 	while (Running)
@@ -239,11 +287,15 @@ int main()
 						continue;
 					}
 
-					if (Input[4] == 10 && RoomID == -1)
+					if (Input[4] == 10 && RoomID == -1 && Input[5] == 6)
+						UpdateRooms(Client);
+
+					if (Input[4] == 10 && RoomID == -1 && Input[5] == 7)
 					{
 						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Welcome to the Server, Use CTRL+ENTER to select.";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
+						UpdateRooms(Client);
 						continue;
 					}
 
@@ -375,34 +427,25 @@ int main()
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(c.Client, Header + Out);
 							}
+
+							JoinRoom(Values, Vals);
 						}
+					}
 
-						result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
+					if (RoomID < 0 && Input[4] == 12 && Input[5] == 1)
+					{
+						std::stringstream in(std::string(Input, 1024).erase(0, 7));
+						std::string Val;
+						std::vector<std::string> Vals;
 
-						if (result != PlayerRooms.end())
+						while (std::getline(in, Val, '\0'))
 						{
-							if (result->RoomPassword.empty() || result->RoomPassword == Vals[2])
-							{
-								++result->NumPlayers;
-								RoomID = result->RoomID;
-
-								std::string RoomNames;
-								std::string RoomStates;
-								std::string RoomFlags;
-
-								for (auto& Room : PlayerRooms)
-								{
-									RoomNames += Room.RoomName + std::string(1, '\0') + Room.RoomDescription + std::string(1, '\0');
-									RoomStates += std::string(1, static_cast<char>(Room.State));
-									RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
-								}
-
-								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
-								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-								m_TCPServer->Send(Client, Header + Out);
-							}
-							continue;
+							Vals.push_back(Val);
 						}
+
+						Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
+
+						JoinRoom(Values, Vals);
 					}
 				}
 			}
