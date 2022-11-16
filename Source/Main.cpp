@@ -213,7 +213,7 @@ int main()
 				{
 					std::cout << "User: " << UserName << " '" << Ip << "' Disconnected.\n";
 					m_TCPServer->Disconnect(Client);
-					ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == Client; }), ConnectedClients.end());
+					CurClients.erase(std::remove_if(CurClients.begin(), CurClients.end(), [&](Clients const& client) { return client.Client == Client; }), CurClients.end());
 					continue;
 				}
 
@@ -227,8 +227,11 @@ int main()
 
 					if (Input[4] == 7)
 					{
-						for (auto& c : ConnectedClients)
+						for (auto& c : CurClients)
 						{
+							if (c.RoomID != RoomID)
+								continue;
+
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + ": " + std::string(Input, read).erase(0, 5);
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 							m_TCPServer->Send(c.Client, Header + Out);
@@ -244,7 +247,7 @@ int main()
 						continue;
 					}
 
-					if (Input[4] == 10 && RoomID >= 0)
+					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
 					{
 						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&RoomID](Rooms& Room) { return RoomID == Room.RoomID; });
 						--result->NumPlayers;
@@ -288,7 +291,7 @@ int main()
 								{
 									std::cout << "User: " << UserName << " '" << Ip << "' Is Banned, Disconnecting\n";
 									m_TCPServer->Disconnect(Client);
-									ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == Client; }), ConnectedClients.end());
+									CurClients.erase(std::remove_if(CurClients.begin(), CurClients.end(), [&](Clients const& client) { return client.Client == Client; }), CurClients.end());
 									invalidpass = true;
 									break;
 								}
@@ -402,10 +405,6 @@ int main()
 						}
 					}
 				}
-				m_Mutex.lock();
-				ConnectedClients = CurClients;
-				m_Mutex.unlock();
-
 			}
 			// ping pong.
 			//std::string Out = std::string(1, static_cast<char>(ProtocolVersion));
@@ -416,8 +415,19 @@ int main()
 			//	ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == Client; }), ConnectedClients.end());
 			//}
 
+
 		}
-	
+
+		for (auto& Client : CurClients)
+		{
+			m_Mutex.lock();
+			auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](Clients c) { return Client.Client == c.Client; });
+			if (result != ConnectedClients.end())
+			{
+				*result = Client;
+			}
+			m_Mutex.unlock();
+		}
 	}
 
 	Running = false;
