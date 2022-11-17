@@ -575,7 +575,10 @@ int main()
 
 						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
 
-						if (!result->SongSelected)
+						if (!result->SongSelected || 
+							result->CurSong[0] != Vals[0] || 
+							result->CurSong[1] != Vals[1] || 
+							result->CurSong[2] != Vals[2])
 						{
 							for (auto& c : CurClients)
 							{
@@ -592,9 +595,11 @@ int main()
 								Out = std::string(1, static_cast<char>(ProtocolVersion + 8)) + std::string(1, '\1') + Vals[0] + std::string(1, '\0') + Vals[1] + std::string(1, '\0') + Vals[2];
 								Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(c.Client, Header + Out);
+
 							}
 							(*result).SongSelected = true;
 							(*result).UsersMissingSong.clear();
+							(*result).CurSong = {Vals[0], Vals[1], Vals[2]};
 						}
 						else if (result->UsersMissingSong.empty())
 						{
@@ -610,6 +615,9 @@ int main()
 							(*result).NumPlayersWaiting = result->NumPlayers;
 						}
 
+
+
+						continue;
 					}
 
 					if (Input[4] == 10 && RoomID == -1 && Input[5] == 6)

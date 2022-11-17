@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <map>
+#include <array>
 #include "TCPServer.h"
 
 bool Running = true;
@@ -24,6 +25,7 @@ struct Rooms {
 	std::string UsersMissingSong = "";
 	bool SongSelected = false;
 	int NumPlayersWaiting = 0;
+	std::array<std::string, 3> CurSong;
 };
 
 struct Clients {
