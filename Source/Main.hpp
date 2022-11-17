@@ -21,6 +21,9 @@ struct Rooms {
 	int NumPlayers = 0;
 	int State = 0;
 	bool PassFlag = false;
+	std::string UsersMissingSong = "";
+	bool SongSelected = false;
+	int NumPlayersWaiting = 0;
 };
 
 struct Clients {

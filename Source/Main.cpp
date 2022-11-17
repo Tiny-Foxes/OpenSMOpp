@@ -83,6 +83,19 @@ void LeavePlayer(Clients& client, std::vector<Clients>& clients)
 	}
 }
 
+void ListPlayers(Clients& client, std::vector<Clients>& clients)
+{
+	std::string Users;
+
+	for (auto& c : clients)
+		if (c.RoomID == client.RoomID && c.LoggedIn && c.UserName != client.UserName) // do we want to display ourself.
+			Users += std::string(1, ' ') + c.UserName;
+
+	std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Other Players in room : " + Users;
+	std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+	m_TCPServer->Send(client.Client, Header + Out);
+}
+
 void JoinRoom(Clients& client, std::vector<std::string> Vals)
 {
 	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
@@ -326,7 +339,7 @@ int main()
 			auto& UserName = Values.UserName;
 			auto& RoomID = Values.RoomID;
 
-			int ret = ASocket::SelectSocket(Client, 300);
+			int ret = ASocket::SelectSocket(Client, 50000);
 
 			if (ret > 0)
 			{
@@ -393,15 +406,7 @@ int main()
 
 							if (Command == "users")
 							{
-								std::string Users;
-
-								for (auto& c : CurClients)
-									if (c.RoomID == RoomID && c.LoggedIn)
-										Users += std::string(1, ' ') + c.UserName;
-
-								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + Users;
-								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-								m_TCPServer->Send(Client, Header + Out);
+								ListPlayers(Values, CurClients);
 								continue;
 							}
 
@@ -489,6 +494,123 @@ int main()
 						continue;
 					}
 
+					if (Input[4] == 3 && RoomID >= 0)
+					{
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						--(*result).NumPlayersWaiting;
+
+						if (result->NumPlayersWaiting == 0)
+						{
+							for (auto& c : CurClients)
+							{
+								if (c.RoomID != RoomID)
+									continue;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 3));
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
+							(*result).NumPlayersWaiting = result->NumPlayers;
+						}
+						continue;
+					}
+
+					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
+					{
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						if (result->SongSelected)
+							continue;
+						LeavePlayer(Values, CurClients);
+						LeaveRoom(Values, CurClients);
+						for (auto& c : CurClients)
+							UpdateRooms(c.Client);
+
+						continue;
+					}
+
+					if (RoomID >= 0 && Input[4] == 8 && Input[5] == 1)
+					{
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						(*result).UsersMissingSong += UserName + std::string(1, '\0');
+						(*result).SongSelected = false;
+
+						std::stringstream in(std::string(Input, 1024).erase(0, 6));
+						std::string Val;
+						std::vector<std::string> Vals;
+
+						while (std::getline(in, Val, '\0'))
+						{
+							Vals.push_back(Val);
+						}
+
+						Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
+
+						for (auto& c : CurClients)
+						{
+							if (c.RoomID != RoomID)
+								continue;
+
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + " doesn't have Song: " + Vals[0];
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(c.Client, Header + Out);
+						}
+					}
+
+					if (RoomID >= 0 && Input[4] == 8 && Input[5] == 2)
+					{
+						std::stringstream in(std::string(Input, 1024).erase(0, 6));
+						std::string Val;
+						std::vector<std::string> Vals;
+
+						while (std::getline(in, Val, '\0'))
+						{
+							Vals.push_back(Val);
+						}
+
+						Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
+
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						if (!result->SongSelected)
+						{
+							for (auto& c : CurClients)
+							{
+								if (c.RoomID != RoomID)
+									continue;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + " selected song: " + Vals[0];
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+
+								if (c.Client == Client)
+									continue;
+
+								Out = std::string(1, static_cast<char>(ProtocolVersion + 8)) + std::string(1, '\1') + Vals[0] + std::string(1, '\0') + Vals[1] + std::string(1, '\0') + Vals[2];
+								Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
+							(*result).SongSelected = true;
+							(*result).UsersMissingSong.clear();
+						}
+						else if (result->UsersMissingSong.empty())
+						{
+							for (auto& c : CurClients)
+							{
+								if (c.RoomID != RoomID)
+									continue;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 8)) + std::string(1, '\2') + Vals[0] + std::string(1, '\0') + Vals[1] + std::string(1, '\0') + Vals[2];
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
+							(*result).NumPlayersWaiting = result->NumPlayers;
+						}
+
+					}
+
 					if (Input[4] == 10 && RoomID == -1 && Input[5] == 6)
 					{
 						UpdateRooms(Client);
@@ -497,7 +619,6 @@ int main()
 
 					if (Input[4] == 10 && Input[5] == 7)
 					{
-						//LeavePlayer(Values, CurClients);
 						LeaveRoom(Values, CurClients);
 						JoinPlayer(Values, CurClients);
 
@@ -505,17 +626,7 @@ int main()
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(Client, Header + Out);
 						UpdateRooms(Client);
-						continue;
-					}
-
-					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
-					{
-						LeavePlayer(Values, CurClients);
-						LeaveRoom(Values, CurClients);
-						//JoinPlayer(Values, CurClients);
-						for (auto& c : CurClients)
-							UpdateRooms(c.Client);
-
+						ListPlayers(Values, CurClients);
 						continue;
 					}
 
@@ -641,6 +752,7 @@ int main()
 							LeavePlayer(Values, CurClients);
 							JoinRoom(Values, Vals);
 							JoinPlayer(Values, CurClients);
+							ListPlayers(Values, CurClients);
 						}
 						continue;
 					}
@@ -664,6 +776,7 @@ int main()
 						LeavePlayer(Values, CurClients);
 						JoinRoom(Values, Vals);
 						JoinPlayer(Values, CurClients);
+						ListPlayers(Values, CurClients);
 						continue;
 					}
 				}
