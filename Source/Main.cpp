@@ -144,6 +144,15 @@ void LeaveRoom(Clients& client, std::vector<Clients>& clients)
 		}
 		else
 		{
+			auto player = std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName);
+
+			if (player != result->CurPlayers.end())
+			{
+				(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName), result->CurPlayers.end());
+				if (result->NumPlayersPlaying > 0)
+					--(*result).NumPlayersPlaying;
+			}
+
 			if (client.UserName == result->Owner)
 			{
 				for (auto& c : clients)
@@ -389,13 +398,18 @@ int main()
 							{
 								std::string LCommands;
 
-								LCommands += "/users - Show Online Users in Cur Room.\n";
+								LCommands += "/users - Show Online Users in current Room.\n";
 								LCommands += "/login - login as admin.\n";
+
+								if (UserType == 1 || (UserType == 2 && RoomID >= 0)) // Room Owner Commands
+								{
+									LCommands += "/free - Let anyone pick a song.\n";
+								}
 
 								if (UserType == 2) // Admin Commands
 								{
 									LCommands += "/adminkick - kick an user.\n";
-									LCommands += "/userip - get an user IP.\n";
+									LCommands += "/userip - get an users IP.\n";
 								}
 
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + LCommands;
@@ -420,6 +434,26 @@ int main()
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 									m_TCPServer->Send(Client, Header + Out);
 									continue;
+								}
+							}
+
+							if (UserType == 1 || (UserType == 2 && RoomID >= 0))
+							{
+								auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+								if (Command == "free")
+								{
+									for (auto& c : CurClients)
+									{
+										if (c.RoomID != RoomID)
+											continue;
+
+										(*result).FreeMode = result->FreeMode ? false : true;
+
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode:" + (result->FreeMode ? "Enabled" : "Disabled");
+										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+										m_TCPServer->Send(c.Client, Header + Out);
+									}
 								}
 							}
 
@@ -510,10 +544,23 @@ int main()
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 3));
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(c.Client, Header + Out);
+								(*result).CurPlayers.push_back(c.UserName);
 							}
 							(*result).NumPlayersWaiting = result->NumPlayers;
+							(*result).NumPlayersPlaying = result->NumPlayers;
 							(*result).SongSelected = false;
 						}
+						continue;
+					}
+
+					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 4)
+					{
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), UserName), result->CurPlayers.end());
+
+						--(*result).NumPlayersPlaying;
+
 						continue;
 					}
 
@@ -574,6 +621,36 @@ int main()
 						Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
 
 						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						if (UserType == 0 && !result->FreeMode)
+						{
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "FreeMode disabled, Ask Roomhost for /free";
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(Client, Header + Out);
+							continue;
+						}
+
+
+						if (result->NumPlayersPlaying > 0)
+						{
+
+							std::string Players;
+
+							for (std::string player : result->CurPlayers)
+								Players += player + std::string(1, ' ');
+
+							for (auto& c : CurClients)
+							{
+								if (c.RoomID != RoomID)
+									continue;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + Players + "havent finished yet, please wait.";
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
+							continue;
+						}
+
 
 						if (!result->SongSelected || 
 							result->CurSong[0] != Vals[0] || 

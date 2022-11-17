@@ -25,7 +25,10 @@ struct Rooms {
 	std::string UsersMissingSong = "";
 	bool SongSelected = false;
 	int NumPlayersWaiting = 0;
-	std::array<std::string, 3> CurSong;
+	int NumPlayersPlaying = 0;
+	std::array<std::string, 3> CurSong = {};
+	std::vector<std::string> CurPlayers = {};
+	bool FreeMode = false;
 };
 
 struct Clients {
