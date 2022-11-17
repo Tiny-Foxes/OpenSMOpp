@@ -512,6 +512,7 @@ int main()
 								m_TCPServer->Send(c.Client, Header + Out);
 							}
 							(*result).NumPlayersWaiting = result->NumPlayers;
+							(*result).SongSelected = false;
 						}
 						continue;
 					}
