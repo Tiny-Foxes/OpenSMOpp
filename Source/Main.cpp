@@ -339,7 +339,7 @@ int main()
 			auto& UserName = Values.UserName;
 			auto& RoomID = Values.RoomID;
 
-			int ret = ASocket::SelectSocket(Client, 50000);
+			int ret = ASocket::SelectSocket(Client, 500);
 
 			if (ret > 0)
 			{
