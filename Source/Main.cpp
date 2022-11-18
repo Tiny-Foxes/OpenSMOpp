@@ -448,7 +448,7 @@ int main()
 			auto& SMClientID = Values.SMClientID;
 			auto& ScoreTracker = Values.ScoreTracker;
 
-			int ret = ASocket::SelectSocket(Client, 500);
+			int ret = ASocket::SelectSocket(Client, 5);
 
 			if (ret > 0)
 			{
@@ -550,7 +550,7 @@ int main()
 										if (c.RoomID != RoomID)
 											continue;
 
-										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode:" + (result->FreeMode ? "Enabled" : "Disabled");
+										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode: " + (result->FreeMode ? "Enabled" : "Disabled");
 										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 										m_TCPServer->Send(c.Client, Header + Out);
 									}
