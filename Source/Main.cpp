@@ -543,12 +543,12 @@ int main()
 
 								if (Command == "free")
 								{
+									(*result).FreeMode = result->FreeMode ? false : true;
+
 									for (auto& c : CurClients)
 									{
 										if (c.RoomID != RoomID)
 											continue;
-
-										(*result).FreeMode = result->FreeMode ? false : true;
 
 										std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode:" + (result->FreeMode ? "Enabled" : "Disabled");
 										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
