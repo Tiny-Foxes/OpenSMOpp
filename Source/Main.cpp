@@ -657,7 +657,7 @@ int main()
 							value = value >> 8;
 							char second = static_cast<char>(value);
 
-							Combos += std::string(1, first) + std::string(2, second);
+							Combos += std::string(1, first) + std::string(1, second);
 						}
 
 						for (auto& c : CurClients)
