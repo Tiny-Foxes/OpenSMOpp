@@ -4,6 +4,8 @@
 #define WINDOWS
 #endif
 
+#define SCALE(x, l1, h1, l2, h2)	(((x) - (l1)) * ((h2) - (l2)) / ((h1) - (l1)) + (l2))
+
 #include "Main.hpp"
 #include "mini/ini.h"
 #include <thread>
@@ -30,7 +32,7 @@
 	6 - StyleUpdate.
 	7 - Chat.
 	8 - RequestStart.
-	9 - Reserved1.
+	9 - Reserved1. -- Playernames update.
 	10 - MusicSelect.
 	11 - PlayerOptions.
 	12 - StepManiaOnline.
@@ -40,6 +42,101 @@
 	15 - RESERVED3.
 	16 - FriendListUpdate.
 */
+
+unsigned CurGradeCalc(std::array<unsigned, 9> TNSs, unsigned ScoreTracker)
+{
+	float AllNotes = static_cast<float>(TNSs[0] + TNSs[1] + TNSs[2] + TNSs[3] + TNSs[4] + TNSs[7]) * 8.f;
+
+	float Percent = (static_cast<float>(ScoreTracker) / AllNotes) * 100.f;
+
+	if (TNSs[7] == 0 &&
+		TNSs[4] == 0 &&
+		TNSs[3] == 0 &&
+		TNSs[2] == 0)
+	{
+		if (TNSs[1] == 0)
+			return 0; // AAAA
+		return 1; // AAA
+	}
+	if (Percent >= 90.f)
+		return 2; // AA
+	if (Percent >= 80.f)
+		return 3; // A
+	if (Percent >= 70.f)
+		return 4; // B
+	if (Percent >= 60.f)
+		return 5; // C
+	if (Percent >= 50.f)
+		return 6; // D
+	return 20; // E - F ailed
+}
+
+std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker)
+{
+	float input = std::abs(tns);
+
+	if (Type == 0 || Type == 16)
+		return "TapNoteScore_Unknown";
+
+	if (Type == 10 || Type == 26)
+		return "HoldNoteScore_Held";
+
+	if (Type == 2 || Type == 18)
+	{
+		++TNSs[5];
+		return "TapNoteScore_AvoidMine";
+	}
+	else if (Type == 1 || Type == 17)
+	{
+		++TNSs[6];
+		TNSs[8] = 0;
+		return "TapNoteScore_MineHit";
+	}
+	if (input <= 0.001f)
+	{
+		++TNSs[7];
+		TNSs[8] = 0;
+		return "TapNoteScore_Miss";
+	}
+	if (input <= 5.f)
+	{
+		++TNSs[0];
+		++TNSs[8];
+		ScoreTracker += 8;
+		return "TapNoteScore_W1";
+	}
+	if (input <= 10.f)
+	{
+		++TNSs[1];
+		++TNSs[8];
+		ScoreTracker += 7;
+		return "TapNoteScore_W2";
+	}
+	if (input <= 15.f)
+	{
+		++TNSs[2];
+		++TNSs[8];
+		ScoreTracker += 6;
+		return "TapNoteScore_W3";
+	}
+	if (input <= 20.f)
+	{
+		++TNSs[3];
+		TNSs[8] = 0;
+		ScoreTracker += 4;
+		return "TapNoteScore_W4";
+	}
+	if (input <= 25.f)
+	{
+		++TNSs[4];
+		TNSs[8] = 0;
+		ScoreTracker += 2;
+		return "TapNoteScore_W5";
+	}
+	++TNSs[7];
+	TNSs[8] = 0;
+	return "TapNoteScore_Miss";
+}
 
 void UpdateRooms(ASocket::Socket Client)
 {
@@ -279,7 +376,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ Alpha1: By Jousway\n";
+	std::cout << "OpenSMO++ Beta1: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
@@ -347,6 +444,9 @@ int main()
 			auto& UserType = Values.UserType;
 			auto& UserName = Values.UserName;
 			auto& RoomID = Values.RoomID;
+			auto& TNSs = Values.TNSs;
+			auto& SMClientID = Values.SMClientID;
+			auto& ScoreTracker = Values.ScoreTracker;
 
 			int ret = ASocket::SelectSocket(Client, 500);
 
@@ -454,6 +554,7 @@ int main()
 										std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 										m_TCPServer->Send(c.Client, Header + Out);
 									}
+									continue;
 								}
 							}
 
@@ -528,6 +629,52 @@ int main()
 						continue;
 					}
 
+					if (Input[4] == 5)
+					{
+						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+						std::string offset = std::string(Input, 1024).erase(0, 15);
+
+						float InOffset = static_cast<float>((ntohs(static_cast<unsigned char>(offset[0]) + static_cast<unsigned char>(offset[1]))) / 2000.f) - 16.384f;
+
+						std::string TNS = TapNoteScoreCalc(InOffset, Input[5], TNSs, ScoreTracker);
+
+						std::cout << TNS << std::endl;
+
+						std::string Grades;
+						std::string Combos;
+
+						for (auto& c : CurClients)
+						{
+							if (c.RoomID != RoomID)
+								continue;
+
+							Grades += std::string(1, static_cast<char>(CurGradeCalc(c.TNSs, c.ScoreTracker)));
+
+							unsigned short value = htons(static_cast<unsigned short>(c.TNSs[8]));
+
+							char first = static_cast<char>(value);
+							value = value >> 8;
+							char second = static_cast<char>(value);
+
+							Combos += std::string(1, first) + std::string(2, second);
+						}
+
+						for (auto& c : CurClients)
+						{
+							if (c.RoomID != RoomID)
+								continue;
+
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\1') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Combos;
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(c.Client, Header + Out);
+
+							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Grades;
+							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							m_TCPServer->Send(c.Client, Header + Out);
+						}
+					}
+
 					if (Input[4] == 3 && RoomID >= 0)
 					{
 						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
@@ -536,6 +683,7 @@ int main()
 
 						if (result->NumPlayersWaiting == 0)
 						{
+							unsigned PlayerID = 0;
 							for (auto& c : CurClients)
 							{
 								if (c.RoomID != RoomID)
@@ -544,22 +692,58 @@ int main()
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 3));
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 								m_TCPServer->Send(c.Client, Header + Out);
-								(*result).CurPlayers.push_back(c.UserName);
+								if (Input[7] == 16)
+								{
+									(*result).CurPlayers.push_back(c.UserName);
+									c.SMClientID = PlayerID++;
+								}
+
 							}
 							(*result).NumPlayersWaiting = result->NumPlayers;
 							(*result).NumPlayersPlaying = result->NumPlayers;
 							(*result).SongSelected = false;
+
+							if (Input[7] != 16)
+								continue;
+
+							std::string Players;
+
+							for (auto& Player : result->CurPlayers)
+								Players += std::string(1, '\0') + Player + std::string(1, '\0');
+
+							std::string PlayerNums;
+
+							int pnum = 0;
+
+							for (auto& Player : result->CurPlayers)
+								PlayerNums += std::string(1, static_cast<char>(pnum++));
+
+							for (auto& c : CurClients)
+							{
+								if (c.RoomID != RoomID)
+									continue;
+
+								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 9)) + std::string(1, '\0') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Players;
+								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+
+								Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\0') + std::string(1, static_cast<char>(result->CurPlayers.size())) + PlayerNums;
+								Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+								m_TCPServer->Send(c.Client, Header + Out);
+							}
 						}
 						continue;
 					}
 
-					if (Input[4] == 10 && RoomID >= 0 && Input[5] == 4)
+					if ((Input[4] == 10 && RoomID >= 0 && Input[5] == 4) || Input[4] == 4)
 					{
 						auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
 
 						(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), UserName), result->CurPlayers.end());
 
 						--(*result).NumPlayersPlaying;
+						ScoreTracker = 0;
+						TNSs = {};
 
 						continue;
 					}
@@ -630,7 +814,6 @@ int main()
 							continue;
 						}
 
-
 						if (result->NumPlayersPlaying > 0)
 						{
 
@@ -650,7 +833,6 @@ int main()
 							}
 							continue;
 						}
-
 
 						if (!result->SongSelected || 
 							result->CurSong[0] != Vals[0] || 
@@ -691,9 +873,6 @@ int main()
 							}
 							(*result).NumPlayersWaiting = result->NumPlayers;
 						}
-
-
-
 						continue;
 					}
 

@@ -38,6 +38,9 @@ struct Clients {
 	std::string UserName = "Unknown";
 	unsigned UserType = 0;
 	long long RoomID = -1;
+	std::array<unsigned, 9> TNSs = {};
+	unsigned ScoreTracker = 0;
+	unsigned SMClientID = 0;
 };
 
 std::vector<Rooms> PlayerRooms;
