@@ -436,7 +436,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ 1.0: By Jousway\n";
+	std::cout << "OpenSMO++ 1.0.1: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
@@ -857,6 +857,10 @@ int main()
 					--(*result).NumPlayersPlaying;
 					ScoreTracker = 0;
 					TNSs = {};
+
+					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 9)) + std::string(1, '\0') + std::string(1, '\0');
+					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+					m_TCPServer->Send(Client, Header + Out);
 
 					continue;
 				}
