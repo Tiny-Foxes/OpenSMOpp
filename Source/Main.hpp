@@ -41,6 +41,8 @@ struct Clients {
 	std::array<unsigned, 9> TNSs = {};
 	unsigned ScoreTracker = 0;
 	unsigned SMClientID = 0;
+	std::vector<std::string> vInput;
+	bool Connected = true;
 };
 
 std::vector<Rooms> PlayerRooms;
