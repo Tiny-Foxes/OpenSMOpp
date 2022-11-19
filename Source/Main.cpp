@@ -45,11 +45,11 @@
 
 unsigned CurGradeCalc(std::array<unsigned, 9> TNSs, unsigned ScoreTracker)
 {
-	float AllNotes = static_cast<float>(TNSs[0] + TNSs[1] + TNSs[2] + TNSs[3] + TNSs[4] + TNSs[7]) * 8.f;
+	float AllNotes = static_cast<float>(TNSs[0] + TNSs[1] + TNSs[2] + TNSs[3] + TNSs[4] + TNSs[5]) * 8.f;
 
 	float Percent = (static_cast<float>(ScoreTracker) / AllNotes) * 100.f;
 
-	if (TNSs[7] == 0 &&
+	if (TNSs[5] == 0 &&
 		TNSs[4] == 0 &&
 		TNSs[3] == 0 &&
 		TNSs[2] == 0)
@@ -73,6 +73,9 @@ unsigned CurGradeCalc(std::array<unsigned, 9> TNSs, unsigned ScoreTracker)
 
 std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker)
 {
+	if (TNSs[7] < TNSs[8])
+		TNSs[7] = TNSs[8];
+
 	float input = std::abs(tns);
 
 	if (Type == 0 || Type == 16)
@@ -82,22 +85,22 @@ std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs,
 		return "HoldNoteScore_LetGo";
 
 	if (Type == 10 || Type == 26)
-		return "HoldNoteScore_Held";
-
-	if (Type == 2 || Type == 18)
-	{
-		++TNSs[5];
-		return "TapNoteScore_AvoidMine";
-	}
-	else if (Type == 1 || Type == 17)
 	{
 		++TNSs[6];
+		return "HoldNoteScore_Held";
+	}
+
+	if (Type == 2 || Type == 18)
+		return "TapNoteScore_AvoidMine";
+
+	else if (Type == 1 || Type == 17)
+	{
 		TNSs[8] = 0;
 		return "TapNoteScore_MineHit";
 	}
 	if (input <= 0.001f)
 	{
-		++TNSs[7];
+		++TNSs[5];
 		TNSs[8] = 0;
 		return "TapNoteScore_Miss";
 	}
@@ -136,7 +139,7 @@ std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs,
 		ScoreTracker += 2;
 		return "TapNoteScore_W5";
 	}
-	++TNSs[7];
+	++TNSs[5];
 	TNSs[8] = 0;
 	return "TapNoteScore_Miss";
 }
@@ -433,7 +436,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ Beta1: By Jousway\n";
+	std::cout << "OpenSMO++ 1.0: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
@@ -719,6 +722,7 @@ int main()
 						Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						m_TCPServer->Send(c.Client, Header + Out);
 					}
+					continue;
 				}
 
 				if (Input[4] == 3 && RoomID >= 0)
@@ -755,7 +759,7 @@ int main()
 						std::string Players;
 
 						for (auto& Player : result->CurPlayers)
-							Players += std::string(1, '\0') + Player + std::string(1, '\0');
+							Players += std::string(1, '\1') + Player + std::string(1, '\0');
 
 						std::string PlayerNums;
 
@@ -789,7 +793,62 @@ int main()
 					continue;
 				}
 
-				if ((Input[4] == 10 && RoomID >= 0 && Input[5] == 4) || Input[4] == 4)
+				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 5)
+				{
+					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+					std::string Players;
+					std::string Scores;
+					std::string Grades;
+					std::string Difficultys;
+					std::string Taps;
+					int NumPlayers = 0;
+
+					for (auto& c : CurClients)
+					{
+						if (c.RoomID != RoomID)
+							continue;
+
+						++NumPlayers;
+
+						Players += std::string(1, static_cast<char>(c.SMClientID));
+
+						unsigned long value = htonl(static_cast<unsigned long>(c.ScoreTracker));
+						char first = static_cast<char>(value >> 24);
+						char second = static_cast<char>(value >> 16);
+						char third = static_cast<char>(value >> 8);
+						char fourth = static_cast<char>(value);
+
+						Scores += std::string(1, fourth) + std::string(1, third) + std::string(1, second) + std::string(1, first);
+						Grades += std::string(1, static_cast<char>(CurGradeCalc(c.TNSs, c.ScoreTracker)));
+						Difficultys += std::string(1, '\0');
+						unsigned count = 0;
+						for (auto& tns : c.TNSs)
+						{
+							if (count == 8)
+								break;
+
+							unsigned short valueTNS = htons(static_cast<unsigned short>(tns));
+							char firstTNS = static_cast<char>(valueTNS >> 8);
+							char secondTNS = static_cast<char>(valueTNS);
+							Taps += std::string(1, secondTNS) + std::string(1, firstTNS);
+							++count;
+						}
+					}
+
+					for (auto& c : CurClients)
+					{
+						if (c.RoomID != RoomID)
+							continue;
+
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 4)) + std::string(1,static_cast<char>(NumPlayers)) + Players + Scores + Grades + Difficultys + Taps;
+						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+						m_TCPServer->Send(c.Client, Header + Out);
+					}
+					continue;
+				}
+
+				if ((Input[4] == 10 && RoomID >= 0 && Input[5] == 4))
 				{
 					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
 
@@ -800,6 +859,22 @@ int main()
 					TNSs = {};
 
 					continue;
+				}
+
+				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 3)
+				{
+					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+					++(*result).NumPlayersPlaying;
+					(*result).CurPlayers.push_back(UserName);
+				}
+
+				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 1)
+				{
+					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+
+					--(*result).NumPlayersPlaying;
+					(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), UserName), result->CurPlayers.end());
 				}
 
 				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
