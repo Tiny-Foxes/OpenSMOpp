@@ -98,7 +98,7 @@ std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs,
 		TNSs[8] = 0;
 		return "TapNoteScore_MineHit";
 	}
-	if (input <= 0.001f)
+	if (input <= 0.001f && (Type == 3 || Type == 19))
 	{
 		++TNSs[5];
 		TNSs[8] = 0;
@@ -436,7 +436,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ 1.0.1: By Jousway\n";
+	std::cout << "OpenSMO++ 1.0.2: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
