@@ -4,25 +4,27 @@
 #include <mutex>
 #include <map>
 #include <array>
+#include <atomic>
+
 #include "TCPServer.h"
 
-bool Running = true;
+inline std::atomic<bool> Running{true};
 
-std::mutex m_Mutex;
+inline std::mutex m_Mutex;
 
-CTCPServer* m_TCPServer;
-long long g_RoomID = 0;
+inline CTCPServer* m_TCPServer;
+inline long long g_RoomID = 0;
 
 struct Rooms {
 	long long RoomID = -1;
-	std::string Owner = "";
-	std::string RoomName = "";
-	std::string RoomDescription = "";
-	std::string RoomPassword = "";
+	std::string Owner;
+	std::string RoomName;
+	std::string RoomDescription;
+	std::string RoomPassword;
 	int NumPlayers = 0;
 	int State = 0;
 	bool PassFlag = false;
-	std::string UsersMissingSong = "";
+	std::string UsersMissingSong;
 	bool SongSelected = false;
 	int NumPlayersWaiting = 0;
 	int NumPlayersPlaying = 0;
@@ -45,18 +47,18 @@ struct Clients {
 	bool Connected = true;
 };
 
-std::vector<Rooms> PlayerRooms;
-std::vector<Clients> ConnectedClients;
+inline std::vector<Rooms> PlayerRooms;
+inline std::vector<Clients> ConnectedClients;
 
-std::string m_IP;
-bool m_GotIP = false;
-std::string ServerName;
-std::string ElevatedUserLogin;
-unsigned ServerVersion;
-unsigned ProtocolVersion;
-unsigned ServerPort;
-unsigned MaxPlayers;
-std::string ServerDB;
-std::string PWSalt;
+inline std::string m_IP;
+inline bool m_GotIP = false;
+inline std::string ServerName;
+inline std::string ElevatedUserLogin;
+inline unsigned ServerVersion;
+inline unsigned ProtocolVersion;
+inline unsigned ServerPort;
+inline unsigned MaxPlayers;
+inline std::string ServerDB;
+inline std::string PWSalt;
 
 #endif

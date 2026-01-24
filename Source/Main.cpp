@@ -43,11 +43,11 @@
 	16 - FriendListUpdate.
 */
 
-unsigned CurGradeCalc(std::array<unsigned, 9> TNSs, unsigned ScoreTracker)
+unsigned CurGradeCalc(const std::array<unsigned, 9> &TNSs, unsigned ScoreTracker)
 {
-	float AllNotes = static_cast<float>(TNSs[0] + TNSs[1] + TNSs[2] + TNSs[3] + TNSs[4] + TNSs[5]) * 8.f;
+	const float AllNotes = static_cast<float>(TNSs[0] + TNSs[1] + TNSs[2] + TNSs[3] + TNSs[4] + TNSs[5]) * 8.f;
 
-	float Percent = (static_cast<float>(ScoreTracker) / AllNotes) * 100.f;
+	const float Percent = (static_cast<float>(ScoreTracker) / AllNotes) * 100.f;
 
 	if (TNSs[5] == 0 &&
 		TNSs[4] == 0 &&
@@ -71,68 +71,69 @@ unsigned CurGradeCalc(std::array<unsigned, 9> TNSs, unsigned ScoreTracker)
 	return 20; // E - F ailed
 }
 
-std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker)
+std::string TapNoteScoreCalc(const double tns, const int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker)
 {
 	if (TNSs[7] < TNSs[8])
 		TNSs[7] = TNSs[8];
 
-	float input = std::abs(tns);
-
-	if (Type == 0 || Type == 16)
-		return "TapNoteScore_Unknown";
+	const double input = std::abs(tns);
 
 	if (Type == 9 || Type == 25)
+	{
+		TNSs[8] = 0;
 		return "HoldNoteScore_LetGo";
-
+	}
 	if (Type == 10 || Type == 26)
 	{
 		++TNSs[6];
 		return "HoldNoteScore_Held";
 	}
-
 	if (Type == 2 || Type == 18)
 		return "TapNoteScore_AvoidMine";
 
-	else if (Type == 1 || Type == 17)
+	if (Type == 1 || Type == 17)
 	{
 		TNSs[8] = 0;
 		return "TapNoteScore_MineHit";
 	}
-	if (input <= 0.001f && (Type == 3 || Type == 19))
+	if (Type == 0 || Type == 16)
+		return "TapNoteScore_Unknown";
+
+	if (Type == 3 || Type == 19)
 	{
 		++TNSs[5];
 		TNSs[8] = 0;
 		return "TapNoteScore_Miss";
 	}
-	if (input <= 5.f)
+	if (input <= 0.0225)
 	{
 		++TNSs[0];
 		++TNSs[8];
 		ScoreTracker += 8;
 		return "TapNoteScore_W1";
 	}
-	if (input <= 10.f)
+	if (input <= 0.0450)
 	{
 		++TNSs[1];
 		++TNSs[8];
 		ScoreTracker += 7;
 		return "TapNoteScore_W2";
 	}
-	if (input <= 15.f)
+	if (input <= 0.0900)
 	{
 		++TNSs[2];
 		++TNSs[8];
 		ScoreTracker += 6;
 		return "TapNoteScore_W3";
 	}
-	if (input <= 20.f)
+	if (input <= 0.1350)
 	{
 		++TNSs[3];
 		TNSs[8] = 0;
 		ScoreTracker += 4;
 		return "TapNoteScore_W4";
 	}
-	if (input <= 25.f)
+	if (input <= 0.1800)
 	{
 		++TNSs[4];
 		TNSs[8] = 0;
@@ -144,7 +145,7 @@ std::string TapNoteScoreCalc(float tns, int Type, std::array<unsigned, 9>& TNSs,
 	return "TapNoteScore_Miss";
 }
 
-void UpdateRooms(ASocket::Socket Client)
+void UpdateRooms(const ASocket::Socket Client)
 {
 	std::string RoomNames;
 	std::string RoomStates;
@@ -157,12 +158,12 @@ void UpdateRooms(ASocket::Socket Client)
 		RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
 	}
 
-	std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
-	std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-	m_TCPServer->Send(Client, Header + Out);
+	const std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
+	const std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+	(void)m_TCPServer->Send(Client, Header + Out);
 }
 
-void JoinPlayer(Clients& client, std::vector<Clients>& clients)
+void JoinPlayer(const Clients& client, const std::vector<Clients>& clients)
 {
 	for (auto& c : clients)
 	{
@@ -170,11 +171,11 @@ void JoinPlayer(Clients& client, std::vector<Clients>& clients)
 			continue;
 		std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Joined: " + client.UserName;
 		std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-		m_TCPServer->Send(c.Client, Header + Out);
+		(void)m_TCPServer->Send(c.Client, Header + Out);
 	}
 }
 
-void LeavePlayer(Clients& client, std::vector<Clients>& clients)
+void LeavePlayer(const Clients& client, const std::vector<Clients>& clients)
 {
 	for (auto& c : clients)
 	{
@@ -182,28 +183,26 @@ void LeavePlayer(Clients& client, std::vector<Clients>& clients)
 			continue;
 		std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Left: " + client.UserName;
 		std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-		m_TCPServer->Send(c.Client, Header + Out);
+		(void)m_TCPServer->Send(c.Client, Header + Out);
 	}
 }
 
-void ListPlayers(Clients& client, std::vector<Clients>& clients)
+void ListPlayers(const Clients& client, const std::vector<Clients>& clients)
 {
 	std::string Users;
 
 	for (auto& c : clients)
-		if (c.RoomID == client.RoomID && c.LoggedIn && c.UserName != client.UserName) // do we want to display ourself.
+		if (c.RoomID == client.RoomID && c.LoggedIn && c.UserName != client.UserName) // do we want to display ourselves?
 			Users += std::string(1, ' ') + c.UserName;
 
 	std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Other Players in room : " + Users;
 	std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-	m_TCPServer->Send(client.Client, Header + Out);
+	(void)m_TCPServer->Send(client.Client, Header + Out);
 }
 
 void JoinRoom(Clients& client, std::vector<std::string> Vals)
 {
-	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
-
-	if (result != PlayerRooms.end())
+	if (auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](const Rooms& Room) { return Vals[0] == Room.RoomName; }); result != PlayerRooms.end())
 	{
 		if (result->RoomPassword.empty() || result->RoomPassword == Vals[2])
 		{
@@ -221,21 +220,19 @@ void JoinRoom(Clients& client, std::vector<std::string> Vals)
 				RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
 			}
 
-			std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
-			std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-			m_TCPServer->Send(client.Client, Header + Out);
+			const std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\0') + Vals.at(0) + std::string(1, '\0') + Vals.at(1) + std::string(1, '\0') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;;
+			const std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+			(void)m_TCPServer->Send(client.Client, Header + Out);
 		}
 	}
 }
 
 void LeaveRoom(Clients& client, std::vector<Clients>& clients)
 {
-	auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return client.RoomID == Room.RoomID; });
-
-	if (result != PlayerRooms.end())
+	if (const auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return client.RoomID == Room.RoomID; }); result != PlayerRooms.end())
 	{
 		--result->NumPlayers;
-		long long OldRoomID = client.RoomID;
+		const long long OldRoomID = client.RoomID;
 		client.RoomID = -1;
 
 		if (client.UserType != 2)
@@ -247,13 +244,11 @@ void LeaveRoom(Clients& client, std::vector<Clients>& clients)
 		}
 		else
 		{
-			auto player = std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName);
-
-			if (player != result->CurPlayers.end())
+			if (const auto player = std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName); player != result->CurPlayers.end())
 			{
-				(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName), result->CurPlayers.end());
+				result->CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), client.UserName), result->CurPlayers.end());
 				if (result->NumPlayersPlaying > 0)
-					--(*result).NumPlayersPlaying;
+					--result->NumPlayersPlaying;
 			}
 
 			if (client.UserName == result->Owner)
@@ -262,18 +257,18 @@ void LeaveRoom(Clients& client, std::vector<Clients>& clients)
 				{
 					if (c.RoomID != OldRoomID)
 						continue;
-					(*result).Owner = c.UserName;
+					result->Owner = c.UserName;
 					c.UserType = 1;
 					break;
 				}
 
-				for (auto& c : clients)
+				for (const auto& c : clients)
 				{
 					if (c.RoomID != OldRoomID)
 						continue;
 					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Old room owner left, New room owner: " + result->Owner;
 					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-					m_TCPServer->Send(c.Client, Header + Out);
+					(void)m_TCPServer->Send(c.Client, Header + Out);
 				}
 			}
 		}
@@ -284,44 +279,49 @@ void SMOReader(Clients Client)
 {
 	while (true)
 	{
-		m_Mutex.lock();
-		auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](Clients c) { return Client.Client == c.Client; });
-		Clients c = *result;
-		m_Mutex.unlock();
+		std::vector<Clients>::iterator result;
+		Clients c;
+		{
+			const std::lock_guard lock(m_Mutex);
+			result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](const Clients& c) { return Client.Client == c.Client; });
+			c = *result;
+		}
 
 		if (c.Connected)
 		{
 			char Input[1024] = {};
-			int read = m_TCPServer->Receive(c.Client, Input, 1024, false);
+			const int read = m_TCPServer->Receive(c.Client, Input, 1024, false);
 
 			if (read < 0)
 				continue;
 
-			m_Mutex.lock();
-			result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](Clients c) { return Client.Client == c.Client; });
-			if (read == 0)
 			{
-				std::cout << "User: " << c.UserName << " '" << c.IP << "' Disconnected.\n";
-				m_TCPServer->Disconnect(c.Client);
-				if (result->LoggedIn)
+				const std::lock_guard lock(m_Mutex);
+				result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](const Clients& c) { return Client.Client == c.Client; });
+				if (read == 0)
 				{
-					LeavePlayer(c, ConnectedClients);
-					LeaveRoom(c, ConnectedClients);
+					std::cout << "User: " << c.UserName << " '" << c.IP << "' Disconnected.\n";
+					(void)m_TCPServer->Disconnect(c.Client);
+					if (result->LoggedIn)
+					{
+						LeavePlayer(c, ConnectedClients);
+						LeaveRoom(c, ConnectedClients);
+					}
+					result->Connected = false;
 				}
-				(*result).Connected = false;
-			}
 
-			if (read > 0)
-			{
-				(*result).vInput.push_back(std::string(Input, 1024));
+				if (read > 0)
+				{
+					result->vInput.emplace_back(Input, 1024);
+				}
 			}
-			m_Mutex.unlock();
 			continue;
 		}
 
-		m_Mutex.lock();
-		ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == c.Client; }), ConnectedClients.end());
-		m_Mutex.unlock();
+		{
+			const std::lock_guard lock(m_Mutex);
+			ConnectedClients.erase(std::remove_if(ConnectedClients.begin(), ConnectedClients.end(), [&](Clients const& client) { return client.Client == c.Client; }), ConnectedClients.end());
+		}
 
 		break;
 	}
@@ -333,41 +333,44 @@ void SMOListener()
 
 	while (Running)
 	{
-		ASocket::Socket ConnectedClient;
-
-		if (m_TCPServer->Listen(ConnectedClient))
+		if (ASocket::Socket ConnectedClient; m_TCPServer->Listen(ConnectedClient))
 		{
 			char Input[1024] = {};
 			m_TCPServer->Receive(ConnectedClient, Input, 1024, false);
 
-			if (Input[4] = 2)
+			if (Input[4] == 2)
 			{
 				while (!m_GotIP)
 					std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-				m_Mutex.lock();
-				std::cout << std::string(Input, Input[6]+2).erase(0,6) + " '" + m_IP + "'"+ " Connected with StepManiaOnline Protocol: V" + std::to_string(Input[5]) + "\n";
-				std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 2)) + std::string(1, static_cast<char>(ServerVersion)) + ServerName;
-				//std::string Salt = std::string(1, PWSalt[0]) + std::string(1, PWSalt[1]) + std::string(1, PWSalt[2]) + std::string(1, PWSalt[3]); // need to figure this out.
-				std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+				const std::lock_guard lock(m_Mutex);
+				{
+					std::cout << std::string(Input, Input[6]+2).erase(0,6) + " '" + m_IP + "'"+ " Connected with StepManiaOnline Protocol: V" + std::to_string(Input[5]) + "\n";
+					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 2)) + std::string(1, static_cast<char>(ServerVersion)) + ServerName;
+					//std::string Salt = std::string(1, PWSalt[0]) + std::string(1, PWSalt[1]) + std::string(1, PWSalt[2]) + std::string(1, PWSalt[3]); // need to figure this out.
+					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 
-				m_TCPServer->Send(ConnectedClient, Header + Out);
+					(void)m_TCPServer->Send(ConnectedClient, Header + Out);
 
-				Clients c({ ConnectedClient, false, m_IP });
-				ConnectedClients.push_back(c);
-				ReaderThreads.push_back(std::thread(SMOReader,c));
-				m_Mutex.unlock();
-				m_GotIP = false;
+					Clients c({ ConnectedClient, false, m_IP });
+					ConnectedClients.push_back(c);
+					ReaderThreads.emplace_back(SMOReader,c);
+					m_GotIP = false;
+				}
 			}
 			else
 			{
-				m_TCPServer->Disconnect(ConnectedClient);
+				(void)m_TCPServer->Disconnect(ConnectedClient);
 			}
 		}
 	}
 
 	for (auto& thread : ReaderThreads)
 		thread.join();
+}
+
+void handle_signal(int) {
+	Running = false;
 }
 
 int main()
@@ -378,11 +381,12 @@ int main()
 	mINI::INIStructure ini;
 	file.read(ini);
 
+	char* endptr = nullptr;
 	ServerName = ini["Server"]["Name"];
-	ServerVersion = atol(ini["Server"]["ServerVersion"].c_str());
-	ProtocolVersion = atol(ini["Server"]["ProtocolVersion"].c_str());
-	ServerPort = atol(ini["Server"]["ServerPort"].c_str());
-	MaxPlayers = atol(ini["Server"]["MaxPlayers"].c_str());
+	ServerVersion = strtol(ini["Server"]["ServerVersion"].c_str(), &endptr, 10);
+	ProtocolVersion = strtol(ini["Server"]["ProtocolVersion"].c_str(), &endptr, 10);
+	ServerPort = strtol(ini["Server"]["ServerPort"].c_str(), &endptr, 10);
+	MaxPlayers = strtol(ini["Server"]["MaxPlayers"].c_str(), &endptr, 10);
 	ElevatedUserLogin = ini["Server"]["ServerPassword"];
 	ServerDB = ini["ServerDB"]["File"];
 	PWSalt = ini["ServerDB"]["PasswordSalt"];
@@ -437,7 +441,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ 1.0.2: By Jousway\n";
+	std::cout << "OpenSMO++ 1.0.3: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
@@ -461,12 +465,11 @@ int main()
 	auto LogPrinter = [&IP, &GotIP](const std::string& strLogMsg) {
 		if (strLogMsg.find("Incoming connection from") != std::string::npos)
 		{
-			m_Mutex.lock();
+			const std::lock_guard lock(m_Mutex);
 			IP = strLogMsg;
 			IP.erase(0, IP.find_first_of('\'') + 1);
 			IP.erase(IP.find_first_of('\''), IP.length());
 			GotIP = true;
-			m_Mutex.unlock();
 		}
 		else
 		{
@@ -474,7 +477,7 @@ int main()
 		}
 	};
 
-	m_TCPServer = new CTCPServer(LogPrinter, std::to_string(ServerPort).c_str());
+	m_TCPServer = new CTCPServer(LogPrinter, std::to_string(ServerPort));
 
 	std::thread SMOListen(SMOListener);
 
@@ -486,15 +489,17 @@ int main()
 
 	std::cout << "ServerLog:\n\n";
 
-	while (true)
+	while (Running)
 	{
-		m_Mutex.lock();
-		m_IP = IP;
-		if (!m_GotIP)
-			m_GotIP = GotIP;
-		GotIP = false;
-		std::vector<Clients> CurClients = ConnectedClients;
-		m_Mutex.unlock();
+		std::vector<Clients> CurClients;
+		{
+			const std::lock_guard lock(m_Mutex);
+			m_IP = IP;
+			if (!m_GotIP)
+				m_GotIP = GotIP;
+			GotIP = false;
+			CurClients = ConnectedClients;
+		}
 
 
 		for (auto& Values : CurClients)
@@ -506,14 +511,16 @@ int main()
 			auto& UserName = Values.UserName;
 			auto& RoomID = Values.RoomID;
 			auto& TNSs = Values.TNSs;
-			auto& SMClientID = Values.SMClientID;
+			//auto& SMClientID = Values.SMClientID; // Unused for now.
 			auto& ScoreTracker = Values.ScoreTracker;
-			
-			m_Mutex.lock();
-			auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Values](Clients c) { return Values.Client == c.Client; });
-			std::vector<std::string> vInput = result->vInput;
-			(*result).vInput.clear();
-			m_Mutex.unlock();
+
+			std::vector<std::string> vInput;
+			{
+				const std::lock_guard lock(m_Mutex);
+				auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Values](const Clients& c) { return Values.Client == c.Client; });
+				vInput = result->vInput;
+				result->vInput.clear();
+			}
 
 			for (auto& Input : vInput)
 			{
@@ -563,7 +570,7 @@ int main()
 
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + LCommands;
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(Client, Header + Out);
+							(void)m_TCPServer->Send(Client, Header + Out);
 							continue;
 						}
 
@@ -581,27 +588,27 @@ int main()
 
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Logged in as admin";
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-								m_TCPServer->Send(Client, Header + Out);
+								(void)m_TCPServer->Send(Client, Header + Out);
 								continue;
 							}
 						}
 
 						if (UserType == 1 || (UserType == 2 && RoomID >= 0))
 						{
-							auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+							auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
 							if (Command == "free")
 							{
-								(*result).FreeMode = result->FreeMode ? false : true;
+								rooms->FreeMode = !(rooms->FreeMode);
 
 								for (auto& c : CurClients)
 								{
 									if (c.RoomID != RoomID)
 										continue;
 
-									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode: " + (result->FreeMode ? "Enabled" : "Disabled");
+									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Set Room to Free mode: " + (rooms->FreeMode ? "Enabled" : "Disabled");
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-									m_TCPServer->Send(c.Client, Header + Out);
+									(void)m_TCPServer->Send(c.Client, Header + Out);
 								}
 								continue;
 							}
@@ -611,42 +618,42 @@ int main()
 						{
 							if (Command == "adminkick")
 							{
-								auto result = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](Clients& client) { return Argument == client.UserName; });
+								auto clients = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](const Clients& client) { return Argument == client.UserName; });
 
-								if (result != CurClients.end())
+								if (clients != CurClients.end())
 								{
 									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Kicked: " + Argument;
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-									m_TCPServer->Send(Client, Header + Out);
+									(void)m_TCPServer->Send(Client, Header + Out);
 
-									std::cout << "User: " << result->UserName << " '" << result->IP << "' Kicked.\n";
-									m_TCPServer->Disconnect(result->Client);
-									(*result).Connected = false;
+									std::cout << "User: " << clients->UserName << " '" << clients->IP << "' Kicked.\n";
+									m_TCPServer->Disconnect(clients->Client);
+									clients->Connected = false;
 								}
 								else
 								{
 									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Not Connected: " + Argument;
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-									m_TCPServer->Send(Client, Header + Out);
+									(void)m_TCPServer->Send(Client, Header + Out);
 								}
 								continue;
 							}
 
 							if (Command == "userip")
 							{
-								auto result = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](Clients& client) { return Argument == client.UserName; });
+								auto clients = std::find_if(CurClients.begin(), CurClients.end(), [&Argument](const Clients& client) { return Argument == client.UserName; });
 
-								if (result != CurClients.end())
+								if (clients != CurClients.end())
 								{
-									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User IP: '" + result->IP + "' For " + Argument;
+									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User IP: '" + clients->IP + "' For " + Argument;
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-									m_TCPServer->Send(Client, Header + Out);
+									(void)m_TCPServer->Send(Client, Header + Out);
 								}
 								else
 								{
 									std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Not Connected: " + Argument;
 									std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-									m_TCPServer->Send(Client, Header + Out);
+									(void)m_TCPServer->Send(Client, Header + Out);
 								}
 								continue;
 							}
@@ -655,7 +662,7 @@ int main()
 
 						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "Invalid Command: " + Command;
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(Client, Header + Out);
+						(void)m_TCPServer->Send(Client, Header + Out);
 						continue;
 					}
 
@@ -672,22 +679,21 @@ int main()
 							usertype = "[|c00000ffRoomHost|c0ffffff] ";
 
 						std::string Text = Input;
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + usertype + UserName + ": " + Text.erase(0, 5).erase(Text.find_first_of('\0'));
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + usertype.append(UserName) + ": " + Text.erase(0, 5).erase(Text.find_first_of('\0'));
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(c.Client, Header + Out);
+						(void)m_TCPServer->Send(c.Client, Header + Out);
 					}
 					continue;
 				}
 
 				if (Input[4] == 5)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					std::string offset = Input;
-					offset.erase(0, 15);
-
-					float InOffset = static_cast<float>((ntohs(static_cast<unsigned char>(offset[0]) + static_cast<unsigned char>(offset[1]))) / 2000.f) - 16.384f;
-
+					unsigned short iOffset;
+					std::memcpy(&iOffset, &Input[15], 2);
+					iOffset = ntohs(iOffset);
+					const double InOffset = iOffset == 0 ? 0.0 : static_cast<double>(iOffset) / 2000.0 - 16.384;
 					std::string TNS = TapNoteScoreCalc(InOffset, Input[5], TNSs, ScoreTracker);
 
 					//std::cout << TNS << std::endl;
@@ -716,24 +722,24 @@ int main()
 						if (c.RoomID != RoomID)
 							continue;
 
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\1') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Combos;
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\1') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + Combos;
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(c.Client, Header + Out);
+						(void)m_TCPServer->Send(c.Client, Header + Out);
 
-						Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Grades;
+						Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + Grades;
 						Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(c.Client, Header + Out);
+						(void)m_TCPServer->Send(c.Client, Header + Out);
 					}
 					continue;
 				}
 
 				if (Input[4] == 3 && RoomID >= 0)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					--(*result).NumPlayersWaiting;
+					--rooms->NumPlayersWaiting;
 
-					if (result->NumPlayersWaiting == 0)
+					if (rooms->NumPlayersWaiting == 0)
 					{
 						unsigned PlayerID = 0;
 						for (auto& c : CurClients)
@@ -743,31 +749,31 @@ int main()
 
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 3));
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 							if (Input[7] == 16)
 							{
-								(*result).CurPlayers.push_back(c.UserName);
+								rooms->CurPlayers.push_back(c.UserName);
 								c.SMClientID = PlayerID++;
 							}
 
 						}
-						(*result).NumPlayersWaiting = result->NumPlayers;
-						(*result).NumPlayersPlaying = result->NumPlayers;
-						(*result).SongSelected = false;
+						rooms->NumPlayersWaiting = rooms->NumPlayers;
+						rooms->NumPlayersPlaying = rooms->NumPlayers;
+						rooms->SongSelected = false;
 
 						if (Input[7] != 16)
 							continue;
 
 						std::string Players;
 
-						for (auto& Player : result->CurPlayers)
+						for (auto& Player : rooms->CurPlayers)
 							Players += std::string(1, '\1') + Player + std::string(1, '\0');
 
 						std::string PlayerNums;
 
 						int pnum = 0;
 
-						for (auto& Player : result->CurPlayers)
+						for ([[maybe_unused]] auto& Player : rooms->CurPlayers)
 							PlayerNums += std::string(1, static_cast<char>(pnum++));
 
 						for (auto& c : CurClients)
@@ -775,21 +781,21 @@ int main()
 							if (c.RoomID != RoomID)
 								continue;
 
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 9)) + std::string(1, '\0') + std::string(1, static_cast<char>(result->CurPlayers.size())) + Players;
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 9)) + std::string(1, '\0') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + Players;
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 
-							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\0') + std::string(1, static_cast<char>(result->CurPlayers.size())) + PlayerNums;
+							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\0') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + PlayerNums;
 							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 
-							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\1') + std::string(1, static_cast<char>(result->CurPlayers.size())) + std::string(result->CurPlayers.size()*2, '\0');
+							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\1') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + std::string(rooms->CurPlayers.size()*2, '\0');
 							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 
-							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(result->CurPlayers.size())) + std::string(result->CurPlayers.size(), '\0');
+							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + std::string(rooms->CurPlayers.size(), '\0');
 							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 						}
 					}
 					continue;
@@ -797,8 +803,6 @@ int main()
 
 				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 5)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
-
 					std::string Players;
 					std::string Scores;
 					std::string Grades;
@@ -843,51 +847,51 @@ int main()
 						if (c.RoomID != RoomID)
 							continue;
 
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 4)) + std::string(1,static_cast<char>(NumPlayers)) + Players + Scores + Grades + Difficultys + Taps;
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 4)) + std::string(1,static_cast<char>(NumPlayers)) += Players += Scores += Grades += Difficultys += Taps;
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(c.Client, Header + Out);
+						(void)m_TCPServer->Send(c.Client, Header + Out);
 					}
 					continue;
 				}
 
 				if ((Input[4] == 10 && RoomID >= 0 && Input[5] == 4))
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), UserName), result->CurPlayers.end());
+					rooms->CurPlayers.erase(std::find(rooms->CurPlayers.begin(), rooms->CurPlayers.end(), UserName), rooms->CurPlayers.end());
 
-					--(*result).NumPlayersPlaying;
+					--rooms->NumPlayersPlaying;
 					ScoreTracker = 0;
 					TNSs = {};
 
 					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 9)) + std::string(1, '\0') + std::string(1, '\0');
 					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-					m_TCPServer->Send(Client, Header + Out);
+					(void)m_TCPServer->Send(Client, Header + Out);
 
 					continue;
 				}
 
 				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 3)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					++(*result).NumPlayersPlaying;
-					(*result).CurPlayers.push_back(UserName);
+					++rooms->NumPlayersPlaying;
+					rooms->CurPlayers.push_back(UserName);
 				}
 
 				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 1)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					--(*result).NumPlayersPlaying;
-					(*result).CurPlayers.erase(std::find(result->CurPlayers.begin(), result->CurPlayers.end(), UserName), result->CurPlayers.end());
+					--rooms->NumPlayersPlaying;
+					rooms->CurPlayers.erase(std::find(rooms->CurPlayers.begin(), rooms->CurPlayers.end(), UserName), rooms->CurPlayers.end());
 				}
 
 				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					if (result->SongSelected)
+					if (rooms->SongSelected)
 						continue;
 					LeavePlayer(Values, CurClients);
 					LeaveRoom(Values, CurClients);
@@ -899,10 +903,10 @@ int main()
 
 				if (RoomID >= 0 && Input[4] == 8 && Input[5] == 1)
 				{
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					(*result).UsersMissingSong += UserName + std::string(1, '\0');
-					(*result).SongSelected = false;
+					rooms->UsersMissingSong += UserName + std::string(1, '\0');
+					rooms->SongSelected = false;
 
 					std::stringstream in(Input.erase(0, 6));
 					std::string Val;
@@ -922,7 +926,7 @@ int main()
 
 						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + " doesn't have Song: " + Vals[0];
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(c.Client, Header + Out);
+						(void)m_TCPServer->Send(c.Client, Header + Out);
 					}
 				}
 
@@ -939,22 +943,22 @@ int main()
 
 					Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
 
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](Rooms& Room) { return RoomID == Room.RoomID; });
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
-					if (UserType == 0 && !result->FreeMode)
+					if (UserType == 0 && !rooms->FreeMode)
 					{
 						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "FreeMode disabled, Ask Roomhost for /free";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(Client, Header + Out);
+						(void)m_TCPServer->Send(Client, Header + Out);
 						continue;
 					}
 
-					if (result->NumPlayersPlaying > 0)
+					if (rooms->NumPlayersPlaying > 0)
 					{
 
 						std::string Players;
 
-						for (std::string player : result->CurPlayers)
+						for (const std::string& player : rooms->CurPlayers)
 							Players += player + std::string(1, ' ');
 
 						for (auto& c : CurClients)
@@ -964,15 +968,15 @@ int main()
 
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + Players + "havent finished yet, please wait.";
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 						}
 						continue;
 					}
 
-					if (!result->SongSelected ||
-						result->CurSong[0] != Vals[0] ||
-						result->CurSong[1] != Vals[1] ||
-						result->CurSong[2] != Vals[2])
+					if (!rooms->SongSelected ||
+						rooms->CurSong[0] != Vals[0] ||
+						rooms->CurSong[1] != Vals[1] ||
+						rooms->CurSong[2] != Vals[2])
 					{
 						for (auto& c : CurClients)
 						{
@@ -981,21 +985,21 @@ int main()
 
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + UserName + " selected song: " + Vals[0];
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 
 							if (c.Client == Client)
 								continue;
 
 							Out = std::string(1, static_cast<char>(ProtocolVersion + 8)) + std::string(1, '\1') + Vals[0] + std::string(1, '\0') + Vals[1] + std::string(1, '\0') + Vals[2];
 							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 
 						}
-						(*result).SongSelected = true;
-						(*result).UsersMissingSong.clear();
-						(*result).CurSong = { Vals[0], Vals[1], Vals[2] };
+						rooms->SongSelected = true;
+						rooms->UsersMissingSong.clear();
+						rooms->CurSong = { Vals[0], Vals[1], Vals[2] };
 					}
-					else if (result->UsersMissingSong.empty())
+					else if (rooms->UsersMissingSong.empty())
 					{
 						for (auto& c : CurClients)
 						{
@@ -1004,9 +1008,9 @@ int main()
 
 							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 8)) + std::string(1, '\2') + Vals[0] + std::string(1, '\0') + Vals[1] + std::string(1, '\0') + Vals[2];
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 						}
-						(*result).NumPlayersWaiting = result->NumPlayers;
+						rooms->NumPlayersWaiting = rooms->NumPlayers;
 					}
 					continue;
 				}
@@ -1024,7 +1028,7 @@ int main()
 
 					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + std::string(20, '\n') + "Welcome to the Server, Use CTRL+ENTER to select, type /help for info.";
 					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-					m_TCPServer->Send(Client, Header + Out);
+					(void)m_TCPServer->Send(Client, Header + Out);
 					UpdateRooms(Client);
 					ListPlayers(Values, CurClients);
 					continue;
@@ -1061,7 +1065,7 @@ int main()
 							if (Banned == 1)
 							{
 								std::cout << "User: " << UserName << " '" << Ip << "' Is Banned, Disconnecting\n";
-								m_TCPServer->Disconnect(Client);
+								(void)m_TCPServer->Disconnect(Client);
 								Values.Connected = false;
 								invalidpass = true;
 								break;
@@ -1071,7 +1075,7 @@ int main()
 							{
 								std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\0') + std::string(1, '\1') + "Wrong Password.\n";
 								std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-								m_TCPServer->Send(Client, Header + Out);
+								(void)m_TCPServer->Send(Client, Header + Out);
 								invalidpass = true;
 								break;
 							}
@@ -1086,18 +1090,18 @@ int main()
 					{
 						std::cout << "Creating New User: " << Vals[0] << "\n";
 
-						SQLite::Transaction transaction(db);
+						SQLite::Transaction transaction1(db);
 
 						db.exec(("INSERT INTO Users VALUES (\"" + Vals[0] + "\", \"" + Vals[1] + "\", 0)").c_str());
 
-						transaction.commit();
+						transaction1.commit();
 
 						UserName = Vals[0];
 					}
 
 					std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(2, '\0') + "Correct Password.";
 					std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-					m_TCPServer->Send(Client, Header + Out);
+					(void)m_TCPServer->Send(Client, Header + Out);
 					LoggedIn = true;
 					continue;
 				}
@@ -1119,13 +1123,11 @@ int main()
 					{
 						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "You can't have an empty room name you silly xd.";
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-						m_TCPServer->Send(Client, Header + Out);
+						(void)m_TCPServer->Send(Client, Header + Out);
 						continue;
 					}
 
-					auto result = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](Rooms& Room) { return Vals[0] == Room.RoomName; });
-
-					if (result == PlayerRooms.end())
+					if (auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&Vals](const Rooms& Room) { return Vals[0] == Room.RoomName; }); rooms == PlayerRooms.end())
 					{
 						PlayerRooms.push_back({ g_RoomID++, UserName, Vals[0], Vals[1], Vals[2], 0, 0, !Vals[2].empty() });
 
@@ -1145,9 +1147,9 @@ int main()
 								RoomFlags += std::string(1, Room.PassFlag ? '\1' : '\0');
 							}
 
-							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) + RoomNames + RoomStates + RoomFlags;
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 12)) + std::string(1, '\1') + std::string(1, '\1') + std::string(1, static_cast<char>(PlayerRooms.size())) += RoomNames += RoomStates += RoomFlags;
 							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
-							m_TCPServer->Send(c.Client, Header + Out);
+							(void)m_TCPServer->Send(c.Client, Header + Out);
 						}
 						LeavePlayer(Values, CurClients);
 						JoinRoom(Values, Vals);
@@ -1184,20 +1186,19 @@ int main()
 
 		for (auto& Client : CurClients)
 		{
-			m_Mutex.lock();
-			auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](Clients c) { return Client.Client == c.Client; });
+			const std::lock_guard lock(m_Mutex);
+			auto result = std::find_if(ConnectedClients.begin(), ConnectedClients.end(), [&Client](const Clients& c) { return Client.Client == c.Client; });
 			if (result != ConnectedClients.end())
 			{
-				(*result).Connected = Client.Connected;
-				(*result).LoggedIn = Client.LoggedIn;
-				(*result).RoomID = Client.RoomID;
-				(*result).TNSs = Client.TNSs;
-				(*result).ScoreTracker = Client.ScoreTracker;
-				(*result).SMClientID = Client.SMClientID;
-				(*result).UserName = Client.UserName;
-				(*result).UserType = Client.UserType;
+				result->Connected = Client.Connected;
+				result->LoggedIn = Client.LoggedIn;
+				result->RoomID = Client.RoomID;
+				result->TNSs = Client.TNSs;
+				result->ScoreTracker = Client.ScoreTracker;
+				result->SMClientID = Client.SMClientID;
+				result->UserName = Client.UserName;
+				result->UserType = Client.UserType;
 			}
-			m_Mutex.unlock();
 		}
 	}
 
