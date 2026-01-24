@@ -16,6 +16,7 @@ target_link_libraries(${PROJECT_NAME}
 
 if (MINGW)
 	target_link_libraries(${PROJECT_NAME} ws2_32)
+	target_link_options(${PROJECT_NAME} PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
