@@ -14,6 +14,10 @@ target_link_libraries(${PROJECT_NAME}
 	SQLiteCpp
 )
 
+if (MINGW)
+	target_link_libraries(${PROJECT_NAME} ws2_32)
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC
 	Libs/mINI/src/
 	Libs/socket-cpp/Socket/
