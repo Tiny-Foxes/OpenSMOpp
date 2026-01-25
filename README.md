@@ -8,7 +8,7 @@ git clone https://github.com/Tiny-Foxes/OpenSMOpp.git
 cd OpenSMOpp
 mkdir Build
 cd Build
-cmake -DCMAKE_BUILD_TYPE=Release ../..
+cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
 ```
 
