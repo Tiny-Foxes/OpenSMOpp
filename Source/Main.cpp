@@ -71,7 +71,7 @@ unsigned CurGradeCalc(const std::array<unsigned, 9> &TNSs, unsigned ScoreTracker
 	return 20; // E - F ailed
 }
 
-std::string TapNoteScoreCalc(const double tns, const int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker)
+std::string TapNoteScoreCalc(const double tns, const int Type, std::array<unsigned, 9>& TNSs, unsigned& ScoreTracker, const int NumNotes)
 {
 	if (TNSs[7] < TNSs[8])
 		TNSs[7] = TNSs[8];
@@ -85,7 +85,7 @@ std::string TapNoteScoreCalc(const double tns, const int Type, std::array<unsign
 	}
 	if (Type == 10 || Type == 26)
 	{
-		++TNSs[6];
+		TNSs[6] += NumNotes;
 		return "HoldNoteScore_Held";
 	}
 	if (Type == 2 || Type == 18)
@@ -101,46 +101,46 @@ std::string TapNoteScoreCalc(const double tns, const int Type, std::array<unsign
 
 	if (Type == 3 || Type == 19)
 	{
-		++TNSs[5];
+		TNSs[5] += NumNotes;
 		TNSs[8] = 0;
 		return "TapNoteScore_Miss";
 	}
 	if (input <= 0.0225)
 	{
-		++TNSs[0];
-		++TNSs[8];
-		ScoreTracker += 8;
+		TNSs[0] += NumNotes;
+		TNSs[8] += NumNotes;
+		ScoreTracker += 8 * NumNotes;
 		return "TapNoteScore_W1";
 	}
 	if (input <= 0.0450)
 	{
-		++TNSs[1];
-		++TNSs[8];
-		ScoreTracker += 7;
+		TNSs[1] += NumNotes;
+		TNSs[8] += NumNotes;
+		ScoreTracker += 7 * NumNotes;
 		return "TapNoteScore_W2";
 	}
 	if (input <= 0.0900)
 	{
-		++TNSs[2];
-		++TNSs[8];
-		ScoreTracker += 6;
+		TNSs[2] += NumNotes;
+		TNSs[8] += NumNotes;
+		ScoreTracker += 6 * NumNotes;
 		return "TapNoteScore_W3";
 	}
 	if (input <= 0.1350)
 	{
-		++TNSs[3];
+		TNSs[3] += NumNotes;
 		TNSs[8] = 0;
-		ScoreTracker += 4;
+		ScoreTracker += 4 * NumNotes;
 		return "TapNoteScore_W4";
 	}
 	if (input <= 0.1800)
 	{
-		++TNSs[4];
+		TNSs[4] += NumNotes;
 		TNSs[8] = 0;
-		ScoreTracker += 2;
+		ScoreTracker += 2 * NumNotes;
 		return "TapNoteScore_W5";
 	}
-	++TNSs[5];
+	TNSs[5] += NumNotes;
 	TNSs[8] = 0;
 	return "TapNoteScore_Miss";
 }
@@ -167,7 +167,7 @@ void JoinPlayer(const Clients& client, const std::vector<Clients>& clients)
 {
 	for (auto& c : clients)
 	{
-		if (c.RoomID != client.RoomID || c.UserName == client.UserName) 
+		if (c.RoomID != client.RoomID || c.UserName == client.UserName)
 			continue;
 		std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 7)) + "User Joined: " + client.UserName;
 		std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
@@ -690,11 +690,14 @@ int main()
 				{
 					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
 
+					const unsigned char GradeAndNumNote = Input[6];
+					const int NumNotes = GradeAndNumNote & 0x0F;
 					unsigned short iOffset;
 					std::memcpy(&iOffset, &Input[15], 2);
-					iOffset = ntohs(iOffset);
+					// 112 == failed.
+					iOffset = GradeAndNumNote == 112 ? 0 : ntohs(iOffset);
 					const double InOffset = iOffset == 0 ? 0.0 : static_cast<double>(iOffset) / 2000.0 - 16.384;
-					std::string TNS = TapNoteScoreCalc(InOffset, Input[5], TNSs, ScoreTracker);
+					std::string TNS = TapNoteScoreCalc(InOffset, Input[5], TNSs, ScoreTracker, NumNotes <= 0 ? 1 : NumNotes);
 
 					//std::cout << TNS << std::endl;
 
