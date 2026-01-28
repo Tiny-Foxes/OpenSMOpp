@@ -441,7 +441,7 @@ int main()
 
 	file.write(ini);
 
-	std::cout << "OpenSMO++ 1.0.3: By Jousway\n";
+	std::cout << "OpenSMO++ 1.0.4: By Jousway\n";
 	std::cout << ("Server Name: " + ServerName + "\n").c_str();
 	std::cout << ("Server (sm uses 128): " + std::to_string(ServerVersion) + "\n").c_str();
 	std::cout << ("Server Port: " + std::to_string(ServerPort) + "\n").c_str();
