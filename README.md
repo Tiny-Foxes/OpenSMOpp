@@ -12,6 +12,6 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
 ```
 
-and it will put the executable in Build/Source.
+and it will put the executable in Releases.
 
 if you find any issues contact me on dscord or make an issue report. :)
