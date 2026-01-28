@@ -890,12 +890,19 @@ int main()
 					rooms->CurPlayers.erase(std::find(rooms->CurPlayers.begin(), rooms->CurPlayers.end(), UserName), rooms->CurPlayers.end());
 				}
 
-				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0)
-				{
-					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
+				if (Input[4] == 10 && RoomID >= 0 && Input[5] == 0) {
+					if (auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; }); rooms->SongSelected && rooms->NumPlayersWaiting != 0) {
+							for (auto& c : CurClients)
+						{
+							if (c.RoomID != RoomID)
+								continue;
 
-					if (rooms->SongSelected)
+							std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 8));
+							std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
+							(void)m_TCPServer->Send(c.Client, Header + Out);
+						}
 						continue;
+					}
 					LeavePlayer(Values, CurClients);
 					LeaveRoom(Values, CurClients);
 					for (auto& c : CurClients)
@@ -906,11 +913,6 @@ int main()
 
 				if (RoomID >= 0 && Input[4] == 8 && Input[5] == 1)
 				{
-					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
-
-					rooms->UsersMissingSong += UserName + std::string(1, '\0');
-					rooms->SongSelected = false;
-
 					std::stringstream in(Input.erase(0, 6));
 					std::string Val;
 					std::vector<std::string> Vals;
@@ -920,7 +922,15 @@ int main()
 						Vals.push_back(Val);
 					}
 
+					auto rooms = std::find_if(PlayerRooms.begin(), PlayerRooms.end(), [&](const Rooms& Room) { return RoomID == Room.RoomID; });
+
 					Vals.erase(std::remove(Vals.begin() + 3, Vals.end(), "\0"), Vals.end());
+
+					if (Vals[0].empty() && Vals[1].empty() && Vals[2].empty())
+						continue;
+
+					rooms->UsersMissingSong += UserName + std::string(1, '\0');
+					rooms->SongSelected = false;
 
 					for (auto& c : CurClients)
 					{
