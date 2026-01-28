@@ -806,7 +806,7 @@ int main()
 					std::string Players;
 					std::string Scores;
 					std::string Grades;
-					std::string Difficultys;
+					std::string Difficulties;
 					std::string Taps;
 					int NumPlayers = 0;
 
@@ -827,7 +827,7 @@ int main()
 
 						Scores += std::string(1, fourth) + std::string(1, third) + std::string(1, second) + std::string(1, first);
 						Grades += std::string(1, static_cast<char>(CurGradeCalc(c.TNSs, c.ScoreTracker)));
-						Difficultys += std::string(1, '\0');
+						Difficulties += std::string(1, '\0');
 						unsigned count = 0;
 						for (auto& tns : c.TNSs)
 						{
@@ -847,7 +847,7 @@ int main()
 						if (c.RoomID != RoomID)
 							continue;
 
-						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 4)) + std::string(1,static_cast<char>(NumPlayers)) += Players += Scores += Grades += Difficultys += Taps;
+						std::string Out = std::string(1, static_cast<char>(ProtocolVersion + 4)) + std::string(1,static_cast<char>(NumPlayers)) += Players += Scores += Grades += Difficulties += Taps;
 						std::string Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 						(void)m_TCPServer->Send(c.Client, Header + Out);
 					}
