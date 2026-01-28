@@ -799,6 +799,8 @@ int main()
 							Out = std::string(1, static_cast<char>(ProtocolVersion + 5)) + std::string(1, '\2') + std::string(1, static_cast<char>(rooms->CurPlayers.size())) + std::string(rooms->CurPlayers.size(), '\0');
 							Header = std::string(3, '\0') + std::string(1, static_cast<char>(Out.size()));
 							(void)m_TCPServer->Send(c.Client, Header + Out);
+
+							c.TNSs = {};
 						}
 					}
 					continue;
